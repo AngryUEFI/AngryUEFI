@@ -31,6 +31,50 @@ VOID EFIAPI DummyNotiftyFunction(IN EFI_EVENT Event, IN VOID *Context) {
     return;
 }
 
+EFI_STATUS send_message(void* message, UINTN message_size, EFI_TCP4_PROTOCOL* IncomingTcp4) {
+    EFI_STATUS Status;
+    EFI_TCP4_IO_TOKEN TxToken = {0};
+    EFI_TCP4_TRANSMIT_DATA TxData = {0};
+
+    TxData.DataLength = message_size;
+    TxData.FragmentCount = 1;
+    TxData.FragmentTable[0].FragmentBuffer = message;
+    TxData.FragmentTable[0].FragmentLength = message_size;
+    TxToken.Packet.TxData = &TxData;
+
+    Status = gBS->CreateEvent(EVT_NOTIFY_SIGNAL,
+                            TPL_CALLBACK,
+                            DummyNotiftyFunction,
+                            NULL,
+                            &TxToken.CompletionToken.Event);
+    if (EFI_ERROR(Status)) {
+        FormatPrint(L"Error: Could not create event for TxToken: %r\n", Status);
+        return Status;
+    }
+    TxToken.CompletionToken.Status = EFI_NOT_READY;
+    Print(L"Got TxToken event.\n");
+
+    Status = IncomingTcp4->Transmit(IncomingTcp4, &TxToken);
+    if (EFI_ERROR(Status)) {
+        FormatPrint(L"Error: TCP Transmit failed: %r\n", Status);
+        gBS->CloseEvent(TxToken.CompletionToken.Event);
+        return Status;
+    }
+
+    // Wait until the transmit completes.
+    while (TxToken.CompletionToken.Status == EFI_NOT_READY) {
+        gBS->Stall(100000); // 100ms
+    }
+    if (EFI_ERROR(TxToken.CompletionToken.Status)) {
+        FormatPrint(L"Error: TCP Transmit completed with error: %r\n", TxToken.CompletionToken.Status);
+        gBS->CloseEvent(TxToken.CompletionToken.Event);
+        return TxToken.CompletionToken.Status;
+    }
+    Print(L"Transmitted.\n");
+
+    return EFI_SUCCESS;
+}
+
 EFI_STATUS
 TcpEchoServer(
   IN EFI_HANDLE           ImageHandle,
@@ -199,9 +243,7 @@ TcpEchoServer(
 
         for (;;) {
             EFI_TCP4_IO_TOKEN *RxToken;
-            EFI_TCP4_IO_TOKEN *TxToken;
             EFI_TCP4_RECEIVE_DATA  *RxData;
-            EFI_TCP4_TRANSMIT_DATA *TxData;
 
             // Allocate and set up the receive token.
             RxToken = AllocateZeroPool(sizeof(EFI_TCP4_IO_TOKEN));
@@ -267,82 +309,18 @@ TcpEchoServer(
             }
             FormatPrint(L"Received %u bytes.\n", ReceivedLength);
 
-            // Allocate and set up the transmit token to echo the data.
-            TxToken = AllocateZeroPool(sizeof(EFI_TCP4_IO_TOKEN));
-            if (TxToken == NULL) {
-                FormatPrint(L"Error: Out of memory for TxToken\n");
-                gBS->CloseEvent(RxToken->CompletionToken.Event);
-                FreePool(RxData);
-                FreePool(RxToken);
-                break;
-            }
-            TxData = AllocateZeroPool(sizeof(EFI_TCP4_TRANSMIT_DATA) +
-                                    sizeof(EFI_TCP4_FRAGMENT_DATA));
-            if (TxData == NULL) {
-                FormatPrint(L"Error: Out of memory for TxData\n");
-                gBS->CloseEvent(RxToken->CompletionToken.Event);
-                FreePool(RxToken);
-                FreePool(TxToken);
-                break;
-            }
-            TxData->DataLength = ReceivedLength;
-            TxData->FragmentCount = 1;
-            TxData->FragmentTable[0].FragmentBuffer = EchoBuffer;
-            TxData->FragmentTable[0].FragmentLength = ReceivedLength;
-            TxToken->Packet.TxData = TxData;
-
-            Status = gBS->CreateEvent(EVT_NOTIFY_SIGNAL,
-                                    TPL_CALLBACK,
-                                    DummyNotiftyFunction,
-                                    NULL,
-                                    &TxToken->CompletionToken.Event);
+            Status = send_message(EchoBuffer, ReceivedLength, IncomingTcp4);
             if (EFI_ERROR(Status)) {
-                FormatPrint(L"Error: Could not create event for TxToken: %r\n", Status);
+                FormatPrint(L"Unable to send message: %r\n", Status);
                 gBS->CloseEvent(RxToken->CompletionToken.Event);
                 FreePool(RxData);
                 FreePool(RxToken);
-                FreePool(TxData);
-                FreePool(TxToken);
-                break;
             }
-            TxToken->CompletionToken.Status = EFI_NOT_READY;
-            Print(L"Got TxToken event.\n");
-
-            Status = IncomingTcp4->Transmit(IncomingTcp4, TxToken);
-            if (EFI_ERROR(Status)) {
-                FormatPrint(L"Error: TCP Transmit failed: %r\n", Status);
-                gBS->CloseEvent(RxToken->CompletionToken.Event);
-                gBS->CloseEvent(TxToken->CompletionToken.Event);
-                FreePool(RxData);
-                FreePool(RxToken);
-                FreePool(TxData);
-                FreePool(TxToken);
-                break;
-            }
-
-            // Wait until the transmit completes.
-            while (TxToken->CompletionToken.Status == EFI_NOT_READY) {
-                gBS->Stall(100000); // 100ms
-            }
-            if (EFI_ERROR(TxToken->CompletionToken.Status)) {
-                FormatPrint(L"Error: TCP Transmit completed with error: %r\n", TxToken->CompletionToken.Status);
-                gBS->CloseEvent(RxToken->CompletionToken.Event);
-                gBS->CloseEvent(TxToken->CompletionToken.Event);
-                FreePool(RxData);
-                FreePool(RxToken);
-                FreePool(TxData);
-                FreePool(TxToken);
-                break;
-            }
-            Print(L"Transmitted.\n");
 
             // Clean up per-iteration resources.
             gBS->CloseEvent(RxToken->CompletionToken.Event);
-            gBS->CloseEvent(TxToken->CompletionToken.Event);
             FreePool(RxData);
             FreePool(RxToken);
-            FreePool(TxData);
-            FreePool(TxToken);
         }
     }
 
