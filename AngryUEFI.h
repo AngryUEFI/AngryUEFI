@@ -1,0 +1,24 @@
+#ifndef ANGRYUEIF_H
+#define ANGRYUEIF_H
+
+#include <Base.h>
+#include <Library/BaseLib.h>
+#include <Library/PrintLib.h>
+#include <Protocol/SimpleTextOut.h>
+
+#define Print(text) TextOutput->OutputString(TextOutput, text)
+#define FormatPrint(fmt, ...) \
+    do { UnicodeSPrint(FormatBuffer, sizeof(FormatBuffer), fmt, ##__VA_ARGS__);  Print(FormatBuffer);} while (0)
+
+
+#define RECEIVE_BUFFER_SIZE 8192+12
+extern UINT8 receive_buffer[RECEIVE_BUFFER_SIZE];
+extern EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *TextOutput;
+
+extern UINT16 FormatBuffer[128];
+
+typedef struct ConnectionContext_s ConnectionContext;
+
+VOID EFIAPI DummyNotiftyFunction(IN EFI_EVENT Event, IN VOID *Context);
+
+#endif /* ANGRYUEIF_H */

@@ -23,6 +23,7 @@
 
 [Sources]
   AngryUEFI.c
+  Protocol.c
 
 [Packages]
   MdePkg/MdePkg.dec

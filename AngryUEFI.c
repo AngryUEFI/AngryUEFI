@@ -17,25 +17,30 @@
 #include <Protocol/Tcp4.h>
 #include <Protocol/ServiceBinding.h>
 
-#define MESSAGE_BUFFER_SIZE 8192+12
-UINT8 message_buffer[MESSAGE_BUFFER_SIZE];
+#include "Protocol.h"
+#include "AngryUEFI.h"
+
+#define RECEIVE_BUFFER_SIZE 8192+12
+UINT8 receive_buffer[RECEIVE_BUFFER_SIZE];
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *TextOutput;
 
-#define Print(text) TextOutput->OutputString(TextOutput, text)
+struct ConnectionContext_s {
+    EFI_TCP4_PROTOCOL* TCPConnection;
+};
 
 UINT16 FormatBuffer[128] = {0};
-#define FormatPrint(fmt, ...) \
-    do { UnicodeSPrint(FormatBuffer, sizeof(FormatBuffer), fmt, ##__VA_ARGS__);  Print(FormatBuffer);} while (0)
 
 VOID EFIAPI DummyNotiftyFunction(IN EFI_EVENT Event, IN VOID *Context) {
     Print(L"Notified.\n");
     return;
 }
 
-EFI_STATUS send_message(void* message, UINTN message_size, EFI_TCP4_PROTOCOL* IncomingTcp4) {
+EFI_STATUS send_message(void* message, UINTN message_size, ConnectionContext* ctx) {
     EFI_STATUS Status;
     EFI_TCP4_IO_TOKEN TxToken = {0};
     EFI_TCP4_TRANSMIT_DATA TxData = {0};
+
+    EFI_TCP4_PROTOCOL* IncomingTcp4 = ctx->TCPConnection;
 
     TxData.DataLength = message_size;
     TxData.FragmentCount = 1;
@@ -148,8 +153,10 @@ EFI_STATUS receive_messages(EFI_TCP4_PROTOCOL* IncomingTcp4) {
 
     // by default indicate no message received
     UINTN message_length = 0;
+    ConnectionContext ctx = {0};
+    ctx.TCPConnection = IncomingTcp4;
     for (;;) {
-        Status = receive_chunk(message_buffer, sizeof(message_buffer), &message_length, IncomingTcp4);
+        Status = receive_chunk(receive_buffer, sizeof(receive_buffer), &message_length, IncomingTcp4);
         if (EFI_ERROR(Status)) {
             FormatPrint(L"Unable to receive chunk: %r\n", Status);
             return Status;
@@ -158,7 +165,7 @@ EFI_STATUS receive_messages(EFI_TCP4_PROTOCOL* IncomingTcp4) {
             return EFI_SUCCESS;
         }
 
-        Status = send_message(message_buffer, message_length, IncomingTcp4);
+        Status = send_message(receive_buffer, message_length, &ctx);
         if (EFI_ERROR(Status)) {
             FormatPrint(L"Unable to send message: %r\n", Status);
             return Status;
