@@ -81,7 +81,7 @@ EFI_STATUS send_message(void* message, UINTN message_size, ConnectionContext* ct
     return EFI_SUCCESS;
 }
 
-EFI_STATUS receive_chunk(void* chunk, UINTN chunk_capacity, UINTN* chunk_length, EFI_TCP4_PROTOCOL* IncomingTcp4) {
+static EFI_STATUS receive_chunk(void* chunk, UINTN chunk_capacity, UINTN* chunk_length, EFI_TCP4_PROTOCOL* IncomingTcp4) {
     EFI_STATUS Status;
 
     // by default indicate no message received
@@ -148,7 +148,7 @@ EFI_STATUS receive_chunk(void* chunk, UINTN chunk_capacity, UINTN* chunk_length,
     return EFI_SUCCESS;
 }
 
-EFI_STATUS receive_messages(EFI_TCP4_PROTOCOL* IncomingTcp4) {
+static EFI_STATUS receive_messages(EFI_TCP4_PROTOCOL* IncomingTcp4) {
     EFI_STATUS Status;
 
     // by default indicate no message received
@@ -156,7 +156,16 @@ EFI_STATUS receive_messages(EFI_TCP4_PROTOCOL* IncomingTcp4) {
     ConnectionContext ctx = {0};
     ctx.TCPConnection = IncomingTcp4;
     for (;;) {
-        Status = receive_chunk(receive_buffer, sizeof(receive_buffer), &message_length, IncomingTcp4);
+        // High level overview
+        // 1. Receive 4 Bytes to get message length
+        // 2. Receive Remainder of message
+        // 2.1. loop receive calls until message length reached
+        // 3. Dispatch to message handling
+        // 4. Loop for next message
+        
+        UINTN header_message_length = 0;
+        UINTN current_message_size = 0;
+        Status = receive_chunk(receive_buffer, 4, &message_length, IncomingTcp4);
         if (EFI_ERROR(Status)) {
             FormatPrint(L"Unable to receive chunk: %r\n", Status);
             return Status;
@@ -164,17 +173,44 @@ EFI_STATUS receive_messages(EFI_TCP4_PROTOCOL* IncomingTcp4) {
         if (message_length == 0) {
             return EFI_SUCCESS;
         }
+        if (message_length != 4) {
+            FormatPrint(L"Unable to read message length, read length: %u.\n", message_length);
+            return EFI_ABORTED;
+        }
+        header_message_length = *(UINT32*)receive_buffer;
+        FormatPrint(L"Header indicates %u Bytes message.\n", header_message_length);
+        while (current_message_size < header_message_length) {
+            Status = receive_chunk(receive_buffer + current_message_size, header_message_length - current_message_size, &message_length, IncomingTcp4);
+            if (EFI_ERROR(Status)) {
+                FormatPrint(L"Unable to receive chunk: %r\n", Status);
+                return Status;
+            }
+            if (message_length == 0) {
+                break;
+            }
+            current_message_size += message_length;
+            FormatPrint(L"Currently have %u Bytes.\n", current_message_size);
+        }
+        
+        if (current_message_size != header_message_length) {
+            FormatPrint(L"Expected to read %u Bytes, only got %u Bytes.\n", header_message_length, current_message_size);
+            return EFI_ABORTED;
+        }
 
-        Status = send_message(receive_buffer, message_length, &ctx);
+        FormatPrint(L"Read %u Bytes message.\n", current_message_size);
+
+        Status = handle_message(receive_buffer, current_message_size, &ctx);
         if (EFI_ERROR(Status)) {
-            FormatPrint(L"Unable to send message: %r\n", Status);
+            FormatPrint(L"Unable to handle message: %r\n", Status);
             return Status;
         }
+
+        Print(L"Handled message.\n");
     }
     return EFI_SUCCESS;
 }
 
-EFI_STATUS
+EFI_STATUS static
 TcpEchoServer(
   IN EFI_HANDLE           ImageHandle,
   IN EFI_SYSTEM_TABLE     *SystemTable

@@ -5,6 +5,7 @@
 #include <Library/BaseLib.h>
 #include <Library/PrintLib.h>
 #include <Protocol/SimpleTextOut.h>
+#include <Uefi.h>
 
 #define Print(text) TextOutput->OutputString(TextOutput, text)
 #define FormatPrint(fmt, ...) \
@@ -19,6 +20,7 @@ extern UINT16 FormatBuffer[128];
 
 typedef struct ConnectionContext_s ConnectionContext;
 
+EFI_STATUS send_message(void* message, UINTN message_size, ConnectionContext* ctx);
 VOID EFIAPI DummyNotiftyFunction(IN EFI_EVENT Event, IN VOID *Context);
 
 #endif /* ANGRYUEIF_H */
