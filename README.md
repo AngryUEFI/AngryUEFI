@@ -14,14 +14,19 @@ This repo. This is the actual UEFI application, written mostly in C. It gets pla
 
 A fork of the official EDK2 [repo](https://github.com/tianocore/edk2). Contains the build system and the AngryUEFI application as a submodule.
 
-### AngryDriver
+### AngryCAT
 
 A python application that drives the microcode testing. It talks to AngryUEFI via network sockets.
 
 ## Network Protocol
 
-Documented in the AngryDriver repo. tl;dr: TLV: 4 byte Type | 4 byte unsigned BE Length | Payload
+Documented in the AngryCAT repo. tl;dr: LMTV: 4 byte unsigned BE Length | 4 byte Metadata | 4 byte Type | Payload
 
 ## Building
 
-Documented in the AngryEDK2 repo. tl;dr: cd AngryEDK2; docker run; do init; build
+Documented in the AngryEDK2 repo. tl;dr: cd AngryEDK2; ./init.sh; ./build.sh; ./run.sh
+
+## License
+[BSD License](http://opensource.org/licenses/bsd-license.php).
+
+Thanks to [TcpTransport](https://github.com/vinxue/TcpTransport) for pointers on the "network stack"!
