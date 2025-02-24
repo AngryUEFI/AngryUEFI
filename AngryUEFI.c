@@ -20,7 +20,6 @@
 #include "Protocol.h"
 #include "AngryUEFI.h"
 
-#define RECEIVE_BUFFER_SIZE 8192+12
 UINT8 receive_buffer[RECEIVE_BUFFER_SIZE];
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *TextOutput;
 
@@ -109,7 +108,14 @@ static EFI_STATUS receive_chunk(void* chunk, UINTN chunk_capacity, UINTN* chunk_
     Print(L"Got RxToken event.\n");
 
     Status = IncomingTcp4->Receive(IncomingTcp4, &RxToken);
-    if (EFI_ERROR(Status)) {
+    if (Status == 0x8000000000000068uLL) {
+        // this likely indicates the peer closed the connection
+        // unknown why this code indicates this
+        gBS->CloseEvent(RxToken.CompletionToken.Event);
+        Print(L"Peer closed the conneciton\n");
+        *chunk_length = 0;
+        return EFI_SUCCESS;
+    } else if (EFI_ERROR(Status)) {
         FormatPrint(L"Error: TCP Receive failed: %r\n", Status);            
         gBS->CloseEvent(RxToken.CompletionToken.Event);
         return Status;
@@ -121,7 +127,7 @@ static EFI_STATUS receive_chunk(void* chunk, UINTN chunk_capacity, UINTN* chunk_
         gBS->Stall(100000); // 100ms
     }
 
-    if (RxToken.CompletionToken.Status == 0x8000000000000068) {
+    if (RxToken.CompletionToken.Status == 0x8000000000000068uLL) {
         // this likely indicates the peer closed the connection
         // unknown why this code indicates this
         gBS->CloseEvent(RxToken.CompletionToken.Event);
