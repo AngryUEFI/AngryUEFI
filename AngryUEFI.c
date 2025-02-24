@@ -19,6 +19,7 @@
 
 #include "Protocol.h"
 #include "AngryUEFI.h"
+#include "stubs.h"
 
 UINT8 receive_buffer[RECEIVE_BUFFER_SIZE];
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *TextOutput;
@@ -241,6 +242,12 @@ TcpEchoServer(
 
     Print(L"Hello UEFI!\n");
     FormatPrint(L"Hello %u Format!\n", 42);
+
+    UINT64 ret = test_stub(0x123456789ABCDEF0ull, 0x0FEDCBA987654321ull);
+    UINT64 expected = (0x123456789ABCDEF0ull + 0x0FEDCBA987654321ull) ^ 0xdeadbeefdeadc0deull;
+    if (ret != expected) {
+        FormatPrint(L"test stub returned invalid. got 0x%016llX, expected 0x%016llX.\n", ret, expected);
+    }
     
     // Locate handles that support the TCP4 Service Binding Protocol.
     Status = gBS->LocateHandleBuffer(ByProtocol,

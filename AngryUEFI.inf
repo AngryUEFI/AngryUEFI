@@ -24,6 +24,7 @@
 [Sources]
   AngryUEFI.c
   Protocol.c
+  stubs.s
 
 [Packages]
   MdePkg/MdePkg.dec
