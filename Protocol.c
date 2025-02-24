@@ -8,38 +8,11 @@
 #include <Uefi.h>
 
 #include "AngryUEFI.h"
+#include "handlers/debug.h"
+#include "handlers/ucode.h"
 
-#define RESPONSE_PAYLOAD_SIZE 1024
 UINT8 payload_buffer[RESPONSE_PAYLOAD_SIZE];
-#define RESPONSE_BUFFER_SIZE RESPONSE_PAYLOAD_SIZE + 12 // 1024 Bytes Payload + 4 Bytes Length + 4 Bytes Metadata + 4 Bytes Message Type
 UINT8 response_buffer[RESPONSE_BUFFER_SIZE];
-
-#define HEADER_SIZE 12
-
-#pragma pack(1)
-typedef struct MetaData_s {
-    UINT8 Major;
-    UINT8 Minor;
-    UINT8 Control;
-    UINT8 Reserved;
-} MetaData;
-#pragma pack()
-
-enum MessageType {
-    MSG_PING = 0x1,
-    MSG_MULTIPING = 0x2,
-    MSG_GETMSGSIZE = 0x3,
-
-    MSG_STATUS = 0x80000000,
-    MSG_PONG = 0x80000001,
-    MSG_MSGSIZE = 0x80000003,
-};
-
-EFI_STATUS handle_ping(UINT8* payload, UINTN payload_length, ConnectionContext* ctx);
-EFI_STATUS handle_multi_ping(UINT8* payload, UINTN payload_length, ConnectionContext* ctx);
-EFI_STATUS handle_get_msg_size(UINT8* payload, UINTN payload_length, ConnectionContext* ctx);
-
-EFI_STATUS construct_message(UINT8* message_buffer, UINTN buffer_capacity, UINT32 message_type, UINT8* payload, UINTN payload_length, BOOLEAN last_message);
 
 EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContext* ctx) {
     EFI_STATUS Status = EFI_SUCCESS;
@@ -100,104 +73,6 @@ EFI_STATUS construct_message(UINT8* message_buffer, UINTN buffer_capacity, UINT3
     CopyMem(message_buffer + 4, &meta_data, sizeof(meta_data));
     ((UINT32*)message_buffer)[2] = message_type;
     CopyMem(message_buffer + 12, payload, payload_length);
-
-    return EFI_SUCCESS;
-}
-
-EFI_STATUS handle_ping(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
-    Print(L"Handling PING message.\n");
-    if (payload_length < 4) {
-        FormatPrint(L"PING is too short, need at least 4 Bytes, got %u.\n", payload_length);
-        return EFI_INVALID_PARAMETER;
-    }
-
-    UINT32 ping_size = *(UINT32*)payload;
-    if (ping_size != payload_length - 4) {
-        FormatPrint(L"Mismatch in PING package, expected %u Bytes, got %u.\n", payload_length - 4, ping_size);
-        return EFI_INVALID_PARAMETER;
-    }
-
-    const UINTN response_size = ping_size + 4 + HEADER_SIZE;
-    *(UINT32*)payload_buffer = ping_size;
-    CopyMem(payload_buffer + 4, payload + 4, ping_size);
-    EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_PONG, payload_buffer, ping_size + 4, TRUE);
-    if (EFI_ERROR(Status)) {
-        FormatPrint(L"Unable to construct message: %r.\n", Status);
-        return Status;
-    }
-
-    Status = send_message(response_buffer, response_size, ctx);
-    if (EFI_ERROR(Status)) {
-        FormatPrint(L"Unable to send message: %r.\n", Status);
-        return Status;
-    }
-
-    return EFI_SUCCESS;
-}
-
-EFI_STATUS handle_multi_ping(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
-    Print(L"Handling MULTIPING message.\n");
-    if (payload_length < 8) {
-        FormatPrint(L"MULTIPING is too short, need at least 4 Bytes, got %u.\n", payload_length);
-        return EFI_INVALID_PARAMETER;
-    }
-
-    UINT32 ping_count = ((UINT32*)payload)[0];
-    UINT32 ping_size = ((UINT32*)payload)[1];
-    if (ping_size != payload_length - 8) {
-        FormatPrint(L"Mismatch in MULTIPING package, expected %u Bytes, got %u.\n", payload_length - 8, ping_size);
-        return EFI_INVALID_PARAMETER;
-    }
-
-    const UINTN response_size = ping_size + 4 + HEADER_SIZE;
-    *(UINT32*)payload_buffer = ping_size;
-    CopyMem(payload_buffer + 4, payload + 8, ping_size);
-    for (int i = 1; i < ping_count; i++) {
-        EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_PONG, payload_buffer, ping_size + 4, FALSE);
-        if (EFI_ERROR(Status)) {
-            FormatPrint(L"Unable to construct message: %r.\n", Status);
-            return Status;
-        }
-
-        Status = send_message(response_buffer, response_size, ctx);
-        if (EFI_ERROR(Status)) {
-            FormatPrint(L"Unable to send message: %r.\n", Status);
-            return Status;
-        }
-    }
-
-    EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_PONG, payload_buffer, ping_size + 4, TRUE);
-    if (EFI_ERROR(Status)) {
-        FormatPrint(L"Unable to construct message: %r.\n", Status);
-        return Status;
-    }
-
-    Status = send_message(response_buffer, response_size, ctx);
-    if (EFI_ERROR(Status)) {
-        FormatPrint(L"Unable to send message: %r.\n", Status);
-        return Status;
-    }
-
-    return EFI_SUCCESS;
-}
-
-EFI_STATUS handle_get_msg_size(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
-    Print(L"Handling GETMSGSIZE message.\n");
-
-    const UINTN response_size = 4 + HEADER_SIZE;
-    // first 4 bytes of payload are the payload size
-    *(UINT32*)payload_buffer = payload_length - 4;
-    EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_MSGSIZE, payload_buffer, 4, TRUE);
-    if (EFI_ERROR(Status)) {
-        FormatPrint(L"Unable to construct message: %r.\n", Status);
-        return Status;
-    }
-
-    Status = send_message(response_buffer, response_size, ctx);
-    if (EFI_ERROR(Status)) {
-        FormatPrint(L"Unable to send message: %r.\n", Status);
-        return Status;
-    }
 
     return EFI_SUCCESS;
 }

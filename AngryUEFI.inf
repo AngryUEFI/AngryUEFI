@@ -25,6 +25,8 @@
   AngryUEFI.c
   Protocol.c
   stubs.s
+  handlers/debug.c
+  handlers/ucode.c
 
 [Packages]
   MdePkg/MdePkg.dec
