@@ -75,6 +75,79 @@ EFI_STATUS send_message(void* message, UINTN message_size, EFI_TCP4_PROTOCOL* In
     return EFI_SUCCESS;
 }
 
+EFI_STATUS receive_message(void* message, UINTN message_capacity, UINTN* message_length, EFI_TCP4_PROTOCOL* IncomingTcp4) {
+    EFI_STATUS Status;
+
+    // by default indicate no message received
+    *message_length = 0;
+    for (;;) {
+        EFI_TCP4_IO_TOKEN RxToken = {0};
+        EFI_TCP4_RECEIVE_DATA  RxData = {0};
+
+        RxData.DataLength    = message_capacity;
+        RxData.FragmentCount = 1;
+        RxData.FragmentTable[0].FragmentBuffer = message;
+        RxData.FragmentTable[0].FragmentLength = message_capacity;
+        RxToken.Packet.RxData = &RxData;
+
+        RxToken.CompletionToken.Status = EFI_NOT_READY;
+        Status = gBS->CreateEvent(EVT_NOTIFY_SIGNAL,
+                                TPL_CALLBACK,
+                                DummyNotiftyFunction,
+                                NULL,
+                                &RxToken.CompletionToken.Event);
+        if (EFI_ERROR(Status)) {
+            FormatPrint(L"Error: Could not create event for RxToken: %r\n", Status);
+            return Status;
+        }
+        Print(L"Got RxToken event.\n");
+
+        Status = IncomingTcp4->Receive(IncomingTcp4, &RxToken);
+        if (EFI_ERROR(Status)) {
+            FormatPrint(L"Error: TCP Receive failed: %r\n", Status);            
+            gBS->CloseEvent(RxToken.CompletionToken.Event);
+            return Status;
+        }
+        Print(L"Receiving.\n");
+
+        // Wait until the receive completes.
+        while (RxToken.CompletionToken.Status == EFI_NOT_READY) {
+            gBS->Stall(100000); // 100ms
+        }
+
+        if (RxToken.CompletionToken.Status == 0x8000000000000068) {
+            // this likely indicates the peer closed the connection
+            // unknown why this code indicates this
+            gBS->CloseEvent(RxToken.CompletionToken.Event);
+            Print(L"Peer closed the conneciton\n");
+            return EFI_SUCCESS;
+        } else if (EFI_ERROR(RxToken.CompletionToken.Status)) {
+            FormatPrint(L"Error: TCP Receive completed with error: %r, %u\n", RxToken.CompletionToken.Status, RxToken.CompletionToken.Status);
+            gBS->CloseEvent(RxToken.CompletionToken.Event);
+            return RxToken.CompletionToken.Status;
+        }
+        *message_length = RxToken.Packet.RxData->DataLength;
+        if (*message_length == 0) {
+            FormatPrint(L"Connection closed by peer.\n");
+            gBS->CloseEvent(RxToken.CompletionToken.Event);
+            return EFI_SUCCESS;
+        }
+        FormatPrint(L"Received %u bytes.\n", *message_length);
+
+        Status = send_message(message, *message_length, IncomingTcp4);
+        if (EFI_ERROR(Status)) {
+            FormatPrint(L"Unable to send message: %r\n", Status);
+            gBS->CloseEvent(RxToken.CompletionToken.Event);
+            return Status;
+        }
+
+        // Clean up per-iteration resources.
+        gBS->CloseEvent(RxToken.CompletionToken.Event);
+
+    }
+    return EFI_SUCCESS;
+}
+
 EFI_STATUS
 TcpEchoServer(
   IN EFI_HANDLE           ImageHandle,
@@ -92,7 +165,6 @@ TcpEchoServer(
     EFI_TCP4_LISTEN_TOKEN               ListenToken;
     EFI_TCP4_CLOSE_TOKEN                CloseToken;
     UINT8                               EchoBuffer[ECHO_BUFFER_SIZE];
-    UINTN                               ReceivedLength;
 
     Status = gBS->LocateProtocol (&gEfiSimpleTextOutProtocolGuid, NULL, (VOID**)&TextOutput);
     if (EFI_ERROR(Status)) {
@@ -241,87 +313,14 @@ TcpEchoServer(
         }
         Print(L"Got incoming TCP4 protocol interface.\n");
 
-        for (;;) {
-            EFI_TCP4_IO_TOKEN *RxToken;
-            EFI_TCP4_RECEIVE_DATA  *RxData;
-
-            // Allocate and set up the receive token.
-            RxToken = AllocateZeroPool(sizeof(EFI_TCP4_IO_TOKEN));
-            if (RxToken == NULL) {
-                FormatPrint(L"Error: Out of memory for RxToken\n");
-                break;
-            }
-            RxData = AllocateZeroPool(sizeof(EFI_TCP4_RECEIVE_DATA) +
-                                    sizeof(EFI_TCP4_FRAGMENT_DATA));
-            if (RxData == NULL) {
-                FormatPrint(L"Error: Out of memory for RxData\n");
-                FreePool(RxToken);
-                break;
-            }
-            RxData->DataLength    = ECHO_BUFFER_SIZE;
-            RxData->FragmentCount = 1;
-            RxData->FragmentTable[0].FragmentBuffer = EchoBuffer;
-            RxData->FragmentTable[0].FragmentLength = ECHO_BUFFER_SIZE;
-            RxToken->Packet.RxData = RxData;
-
-            RxToken->CompletionToken.Status = EFI_NOT_READY;
-            Status = gBS->CreateEvent(EVT_NOTIFY_SIGNAL,
-                                    TPL_CALLBACK,
-                                    DummyNotiftyFunction,
-                                    NULL,
-                                    &RxToken->CompletionToken.Event);
-            if (EFI_ERROR(Status)) {
-                FormatPrint(L"Error: Could not create event for RxToken: %r\n", Status);
-                FreePool(RxData);
-                FreePool(RxToken);
-                break;
-            }
-            Print(L"Got RxToken event.\n");
-
-            Status = IncomingTcp4->Receive(IncomingTcp4, RxToken);
-            if (EFI_ERROR(Status)) {
-                FormatPrint(L"Error: TCP Receive failed: %r\n", Status);            
-                gBS->CloseEvent(RxToken->CompletionToken.Event);
-                FreePool(RxData);
-                FreePool(RxToken);
-                break;
-            }
-            Print(L"Receiving.\n");
-
-            // Wait until the receive completes.
-            while (RxToken->CompletionToken.Status == EFI_NOT_READY) {
-                gBS->Stall(100000); // 100ms
-            }
-            if (EFI_ERROR(RxToken->CompletionToken.Status)) {
-                FormatPrint(L"Error: TCP Receive completed with error: %r\n", RxToken->CompletionToken.Status);
-                gBS->CloseEvent(RxToken->CompletionToken.Event);
-                FreePool(RxData);
-                FreePool(RxToken);
-                break;
-            }
-            ReceivedLength = RxToken->Packet.RxData->DataLength;
-            if (ReceivedLength == 0) {
-                FormatPrint(L"Connection closed by peer.\n");
-                gBS->CloseEvent(RxToken->CompletionToken.Event);
-                FreePool(RxData);
-                FreePool(RxToken);
-                break;
-            }
-            FormatPrint(L"Received %u bytes.\n", ReceivedLength);
-
-            Status = send_message(EchoBuffer, ReceivedLength, IncomingTcp4);
-            if (EFI_ERROR(Status)) {
-                FormatPrint(L"Unable to send message: %r\n", Status);
-                gBS->CloseEvent(RxToken->CompletionToken.Event);
-                FreePool(RxData);
-                FreePool(RxToken);
-            }
-
-            // Clean up per-iteration resources.
-            gBS->CloseEvent(RxToken->CompletionToken.Event);
-            FreePool(RxData);
-            FreePool(RxToken);
+        UINTN ReceivedLength = 0;
+        Status = receive_message(EchoBuffer, ECHO_BUFFER_SIZE, &ReceivedLength, IncomingTcp4);
+         if (EFI_ERROR(Status)) {
+            FormatPrint(L"Unable to receive message: %r\n", Status);
+            goto CLEANUP;
         }
+
+        FormatPrint(L"Received %u bytes.\n", ReceivedLength);
     }
 
 CLEANUP:
