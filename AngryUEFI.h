@@ -7,10 +7,24 @@
 #include <Protocol/SimpleTextOut.h>
 #include <Uefi.h>
 
+// TODO: Figure out how to pass this in via the build system
+// Note: you need to flip between build modes passed to ./build.sh for this get picked up
+// e.g. if currently in DEBUG, build once as RELEASE, then again as DEBUG
+// no, this does not make any sense
+#define ANGRYUEFI_DEBUG
+
+#ifdef ANGRYUEFI_DEBUG
+#define PrintDebug(text) TextOutput->OutputString(TextOutput, text)
+#define FormatPrintDebug(fmt, ...) \
+    do { UnicodeSPrint(FormatBuffer, sizeof(FormatBuffer), fmt, ##__VA_ARGS__);  PrintDebug(FormatBuffer);} while (0)
+#else
+#define PrintDebug(text)
+#define FormatPrintDebug(fmt, ...)
+#endif
+
 #define Print(text) TextOutput->OutputString(TextOutput, text)
 #define FormatPrint(fmt, ...) \
     do { UnicodeSPrint(FormatBuffer, sizeof(FormatBuffer), fmt, ##__VA_ARGS__);  Print(FormatBuffer);} while (0)
-
 
 #define RECEIVE_BUFFER_SIZE 8192+12
 extern UINT8 receive_buffer[RECEIVE_BUFFER_SIZE];

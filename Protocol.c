@@ -16,14 +16,14 @@ UINT8 response_buffer[RESPONSE_BUFFER_SIZE];
 
 EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContext* ctx) {
     if (message_length < 8) {
-        FormatPrint(L"Message too small, got %u Bytes, need at least 8.\n", message_length);
+        FormatPrintDebug(L"Message too small, got %u Bytes, need at least 8.\n", message_length);
         return EFI_INVALID_PARAMETER;
     }
 
     MetaData meta_data;
     CopyMem(&meta_data, message, sizeof(MetaData));
     if (meta_data.Major != 1 || meta_data.Minor != 0) {
-        FormatPrint(L"Unsupported version %u.%u, only 1.0 is supported.\n", meta_data.Major, meta_data.Minor);
+        FormatPrintDebug(L"Unsupported version %u.%u, only 1.0 is supported.\n", meta_data.Major, meta_data.Minor);
         return EFI_INVALID_PARAMETER;
     }
 
@@ -53,7 +53,7 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
             handle_read_msr(message + payload_offset, message_length - payload_offset, ctx);
             break;
         default:
-            FormatPrint(L"Unknown message type 0x%08X\n", message_type);
+            FormatPrintDebug(L"Unknown message type 0x%08X\n", message_type);
             send_message(FormatBuffer, 0x80000001, ctx);
             break;
     }
@@ -62,9 +62,9 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
 }
 
 EFI_STATUS construct_message(UINT8* message_buffer, UINTN buffer_capacity, UINT32 message_type, UINT8* payload, UINTN payload_length, BOOLEAN last_message) {
-    FormatPrint(L"Constructing message with %u paylength and type 0x%08X.\n", payload_length, message_type);
+    FormatPrintDebug(L"Constructing message with %u paylength and type 0x%08X.\n", payload_length, message_type);
     if (buffer_capacity < payload_length + 12) {
-        FormatPrint(L"Not enough space in response buffer, need %u, got %u\n", payload_length + 12, buffer_capacity);
+        FormatPrintDebug(L"Not enough space in response buffer, need %u, got %u\n", payload_length + 12, buffer_capacity);
         return EFI_INVALID_PARAMETER;
     }
 
@@ -90,13 +90,13 @@ EFI_STATUS send_status(UINT32 status_code, CHAR16* message, ConnectionContext* c
     *(UINT32*)payload_buffer = status_code;
     EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_STATUS, payload_buffer, response_size, TRUE);
     if (EFI_ERROR(Status)) {
-        FormatPrint(L"Unable to construct message: %r.\n", Status);
+        FormatPrintDebug(L"Unable to construct message: %r.\n", Status);
         return Status;
     }
 
     Status = send_message(response_buffer, response_size + HEADER_SIZE, ctx);
     if (EFI_ERROR(Status)) {
-        FormatPrint(L"Unable to send message: %r.\n", Status);
+        FormatPrintDebug(L"Unable to send message: %r.\n", Status);
         return Status;
     }
 
