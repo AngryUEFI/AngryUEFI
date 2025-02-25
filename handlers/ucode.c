@@ -11,11 +11,28 @@
 #include "Protocol.h"
 #include "AngryUEFI.h"
 #include "stubs.h"
+#include "data/ucode-original-0x17-0x71.h"
+
+#define ORIGINAL_UCODE ucode_original_0x17_0x71
+#define ORIGINAL_UCODE_LEN ucode_original_0x17_0x71_len
 
 UcodeContainer ucodes[UCODE_SLOTS] = {0};
 
+// we alloc space for the update and copy it there even though the
+// original ucode would suffice
+// this allows slot 1 to be used like any other slot
+// this is important to replace the known good update if needed
+void ensure_slot_1() {
+    if (ucodes[1].ucode == NULL) {
+        ucodes[1].ucode = AllocateZeroPool(UCODE_SIZE);
+        CopyMem(ucodes[1].ucode, ORIGINAL_UCODE, ORIGINAL_UCODE_LEN);
+        ucodes[1].length = ORIGINAL_UCODE_LEN;
+    }
+}
+
 EFI_STATUS handle_send_ucode(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     Print(L"Handling SENDUCODE message.\n");
+    ensure_slot_1();
     if (payload_length < 8) {
         FormatPrint(L"SENDUCODE is too short, need at least 8 Bytes, got %u.\n", payload_length);
         send_status(0x1, FormatBuffer, ctx);
@@ -55,6 +72,7 @@ void flip_bit(UINT8* ucode, UINT64 ucode_length, UINT32 position) {
 
 EFI_STATUS handle_flip_bits(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     Print(L"Handling FLIPBITS message.\n");
+    ensure_slot_1();
     if (payload_length < 8) {
         FormatPrint(L"FLIPBITS is too short, need at least 8 Bytes, got %u.\n", payload_length);
         send_status(0x1, FormatBuffer, ctx);
@@ -92,6 +110,7 @@ EFI_STATUS handle_flip_bits(UINT8* payload, UINTN payload_length, ConnectionCont
 
 EFI_STATUS handle_apply_ucode(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     Print(L"Handling MSG_APPLYUCODE message.\n");
+    ensure_slot_1();
     if (payload_length < 8) {
         FormatPrint(L"MSG_APPLYUCODE is too short, need at least 8 Bytes, got %u.\n", payload_length);
         send_status(0x1, FormatBuffer, ctx);
@@ -128,6 +147,7 @@ EFI_STATUS handle_apply_ucode(UINT8* payload, UINTN payload_length, ConnectionCo
 
 EFI_STATUS handle_read_msr(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     Print(L"Handling MSG_READMSR message.\n");
+    ensure_slot_1();
     if (payload_length < 4) {
         FormatPrint(L"MSG_READMSR is too short, need at least 4 Bytes, got %u.\n", payload_length);
         send_status(0x1, FormatBuffer, ctx);
