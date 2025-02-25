@@ -7,7 +7,7 @@
 
 EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContext* ctx);
 EFI_STATUS construct_message(UINT8* message_buffer, UINTN buffer_capacity, UINT32 message_type, UINT8* payload, UINTN payload_length, BOOLEAN last_message);
-
+EFI_STATUS send_status(UINT32 status_code, CHAR16* message, ConnectionContext* ctx);
 
 #define RESPONSE_PAYLOAD_SIZE 1024
 #define RESPONSE_BUFFER_SIZE RESPONSE_PAYLOAD_SIZE + 12 // 1024 Bytes Payload + 4 Bytes Length + 4 Bytes Metadata + 4 Bytes Message Type

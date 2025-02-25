@@ -15,7 +15,6 @@ UINT8 payload_buffer[RESPONSE_PAYLOAD_SIZE];
 UINT8 response_buffer[RESPONSE_BUFFER_SIZE];
 
 EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContext* ctx) {
-    EFI_STATUS Status = EFI_SUCCESS;
     if (message_length < 8) {
         FormatPrint(L"Message too small, got %u Bytes, need at least 8.\n", message_length);
         return EFI_INVALID_PARAMETER;
@@ -33,29 +32,30 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
 
     switch (message_type) {
         case MSG_PING:
-            Status = handle_ping(message + payload_offset, message_length - payload_offset, ctx);
-            if (EFI_ERROR(Status)) {
-                FormatPrint(L"Unable to handle PING message: %r\n", Status);
-                return Status;
-            }
+            handle_ping(message + payload_offset, message_length - payload_offset, ctx);
             break;
         case MSG_MULTIPING:
-            Status = handle_multi_ping(message + payload_offset, message_length - payload_offset, ctx);
-            if (EFI_ERROR(Status)) {
-                FormatPrint(L"Unable to handle MULTIPING message: %r\n", Status);
-                return Status;
-            }
+            handle_multi_ping(message + payload_offset, message_length - payload_offset, ctx);
             break;
         case MSG_GETMSGSIZE:
-            Status = handle_get_msg_size(message + payload_offset, message_length - payload_offset, ctx);
-            if (EFI_ERROR(Status)) {
-                FormatPrint(L"Unable to handle GETMSGSIZE message: %r\n", Status);
-                return Status;
-            }
+            handle_get_msg_size(message + payload_offset, message_length - payload_offset, ctx);
+            break;
+        case MSG_SENDUCODE:
+            handle_send_ucode(message + payload_offset, message_length - payload_offset, ctx);
+            break;
+        case MSG_FLIPBITS:
+            handle_flip_bits(message + payload_offset, message_length - payload_offset, ctx);
+            break;
+        case MSG_APPLYUCODE:
+            handle_apply_ucode(message + payload_offset, message_length - payload_offset, ctx);
+            break;
+        case MSG_READMSR:
+            handle_read_msr(message + payload_offset, message_length - payload_offset, ctx);
             break;
         default:
             FormatPrint(L"Unknown message type 0x%08X\n", message_type);
-            return EFI_INVALID_PARAMETER;
+            send_message(FormatBuffer, 0x80000001, ctx);
+            break;
     }
 
     return EFI_SUCCESS;
@@ -73,6 +73,32 @@ EFI_STATUS construct_message(UINT8* message_buffer, UINTN buffer_capacity, UINT3
     CopyMem(message_buffer + 4, &meta_data, sizeof(meta_data));
     ((UINT32*)message_buffer)[2] = message_type;
     CopyMem(message_buffer + 12, payload, payload_length);
+
+    return EFI_SUCCESS;
+}
+
+EFI_STATUS send_status(UINT32 status_code, CHAR16* message, ConnectionContext* ctx) {
+    UINTN response_size = 8;
+    if (message != NULL) {
+        response_size += StrLen(message);
+        CopyMem(payload_buffer + 4, message, StrLen(message));
+        ((UINT32*)payload_buffer)[1] = StrLen(message) * 2;
+    } else {
+        ((UINT32*)payload_buffer)[1] = 0;
+    }
+
+    *(UINT32*)payload_buffer = status_code;
+    EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_STATUS, payload_buffer, response_size, TRUE);
+    if (EFI_ERROR(Status)) {
+        FormatPrint(L"Unable to construct message: %r.\n", Status);
+        return Status;
+    }
+
+    Status = send_message(response_buffer, response_size + HEADER_SIZE, ctx);
+    if (EFI_ERROR(Status)) {
+        FormatPrint(L"Unable to send message: %r.\n", Status);
+        return Status;
+    }
 
     return EFI_SUCCESS;
 }
