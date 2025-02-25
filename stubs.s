@@ -59,8 +59,7 @@ read_msr_stub:
     rdtsc
     shl $32, %rdx
     or %rdx, %rax
-    sub %rax, %r11
-    mov %r11, %rax
+    sub %r11, %rax
 .endm
 
     .global apply_ucode_simple
