@@ -24,6 +24,10 @@ typedef struct UcodeContainer_s {
 #define UCODE_SLOTS 10
 extern UcodeContainer ucodes[UCODE_SLOTS];
 
+// referenced in stub.s
+extern UINT8* original_ucode;
+extern UINT64 original_ucode_length;
+
 // big enough for family 0x19/Zen 5
 #define UCODE_SIZE 5568
 

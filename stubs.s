@@ -35,10 +35,11 @@ read_msr_stub:
     or %rdx, %rax
     ret
 
-.global apply_ucode_simple
-    .type apply_ucode_simple, @function
-apply_ucode_simple:
-    lea constant_pool+24(%rip), %r10
+# apply the ucode passed in RDI
+# rdtsc(p) difference is stored in RAX
+# use a macro instead of a function to reduce complex instructions like call/ret
+.macro m_apply_ucode
+    lea ucode_patch_address(%rip), %r10
     movl 0(%r10), %r10d
     # TODO: emulator does not support rdtscp
     rdtsc
@@ -60,7 +61,26 @@ apply_ucode_simple:
     or %rdx, %rax
     sub %rax, %r11
     mov %r11, %rax
+.endm
+
+    .global apply_ucode_simple
+    .type apply_ucode_simple, @function
+apply_ucode_simple:
+    m_apply_ucode
     ret
+
+    .global apply_ucode_restore
+    .type apply_ucode_restore, @function
+apply_ucode_restore:
+    m_apply_ucode
+
+    mov %rax, %r9
+    lea original_ucode_s(%rip), %rdi
+    m_apply_ucode
+    mov %r9, %rax
+    ret
+
+.extern original_ucode
 
 # Constant pool section
     .section .rodata
@@ -68,4 +88,10 @@ constant_pool:
     .quad 0x1111111111111111  # Unused constant 1
     .quad 0x2222222222222222  # Unused constant 2
     .quad 0xdeadbeefdeadc0de  # Actual constant used for XOR
+
+    .align 8
+original_ucode_s:
+    .quad original_ucode
+    .align 4
+ucode_patch_address:
     .long 0xc0010020

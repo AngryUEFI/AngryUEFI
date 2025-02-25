@@ -6,5 +6,6 @@
 UINT64 test_stub(UINT64 a, UINT64 b);
 UINT64 read_msr_stub(UINT32 target_msr);
 UINT64 apply_ucode_simple(UINT8* ucode);
+UINT64 apply_ucode_restore(UINT8* ucode);
 
 #endif /* STUBS_H */
