@@ -6,6 +6,8 @@
 #include <Library/PrintLib.h>
 #include <Protocol/SimpleTextOut.h>
 #include <Uefi.h>
+#include <Library/UefiRuntimeServicesTableLib.h>
+
 
 #include "Protocol.h"
 #include "AngryUEFI.h"
@@ -104,6 +106,27 @@ EFI_STATUS handle_get_msg_size(UINT8* payload, UINTN payload_length, ConnectionC
         FormatPrintDebug(L"Unable to send message: %r.\n", Status);
         return Status;
     }
+
+    return EFI_SUCCESS;
+}
+
+EFI_STATUS handle_reboot(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
+    PrintDebug(L"Handling MSG_REBOOT message.\n");
+    if (payload_length < 4) {
+        FormatPrintDebug(L"MSG_REBOOT is too short, need at least 4 Bytes, got %u.\n", payload_length);
+        send_status(0x1, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    UINT32 options = ((UINT32*)payload)[0];
+    BOOLEAN warm_reset = ((options & 0x01) == 1);
+
+    send_status(0x0, NULL, ctx);
+    
+    if (warm_reset)
+        gRT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
+    else
+        gRT->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
 
     return EFI_SUCCESS;
 }

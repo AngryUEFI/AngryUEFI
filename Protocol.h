@@ -30,6 +30,8 @@ enum MessageType {
     MSG_MULTIPING = 0x2,
     MSG_GETMSGSIZE = 0x3,
 
+    MSG_REBOOT = 0x21,
+
     MSG_SENDUCODE = 0x101,
     MSG_FLIPBITS = 0x121,
     MSG_APPLYUCODE = 0x141,

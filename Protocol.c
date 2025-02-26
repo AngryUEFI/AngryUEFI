@@ -40,6 +40,9 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
         case MSG_GETMSGSIZE:
             handle_get_msg_size(message + payload_offset, message_length - payload_offset, ctx);
             break;
+        case MSG_REBOOT:
+            handle_reboot(message + payload_offset, message_length - payload_offset, ctx);
+            break;
         case MSG_SENDUCODE:
             handle_send_ucode(message + payload_offset, message_length - payload_offset, ctx);
             break;
