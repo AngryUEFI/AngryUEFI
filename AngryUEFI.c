@@ -20,6 +20,7 @@
 #include "Protocol.h"
 #include "AngryUEFI.h"
 #include "stubs.h"
+#include "handlers/ucode.h"
 
 UINT8 receive_buffer[RECEIVE_BUFFER_SIZE];
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *TextOutput;
@@ -248,6 +249,14 @@ TcpEchoServer(
     if (ret != expected) {
         FormatPrint(L"test stub returned invalid. got 0x%016llX, expected 0x%016llX.\n", ret, expected);
     }
+
+    read_idt_position();
+    UINT8* idt_structure = read_idt_position();
+    UINT8* idf_addr = (idt_structure+2);
+    UINT16 idf_size = *(UINT16*)idt_structure;
+    FormatPrint(L"IDT is at 0x%016X, length %u.\n", idf_addr, idf_size);
+
+    init_ucode();
     
     // Locate handles that support the TCP4 Service Binding Protocol.
     Status = gBS->LocateHandleBuffer(ByProtocol,
@@ -392,6 +401,16 @@ TcpEchoServer(
             FormatPrint(L"Unable to receive message: %r\n", Status);
             goto CLEANUP;
         }
+
+        if (ListenToken.NewChildHandle != NULL) {
+            gBS->CloseProtocol(
+                ListenToken.NewChildHandle,
+                &gEfiTcp4ProtocolGuid,
+                ImageHandle,
+                Tcp4ServiceBinding
+            );
+        }
+        
     }
 
 CLEANUP:

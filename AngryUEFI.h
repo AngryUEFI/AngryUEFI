@@ -11,7 +11,7 @@
 // Note: you need to flip between build modes passed to ./build.sh for this get picked up
 // e.g. if currently in DEBUG, build once as RELEASE, then again as DEBUG
 // no, this does not make any sense
-#define ANGRYUEFI_DEBUG
+// #define ANGRYUEFI_DEBUG
 
 #ifdef ANGRYUEFI_DEBUG
 #define PrintDebug(text) TextOutput->OutputString(TextOutput, text)

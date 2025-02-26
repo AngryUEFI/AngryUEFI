@@ -35,6 +35,33 @@ read_msr_stub:
     or %rdx, %rax
     ret
 
+.extern hook_gpf
+.extern unhook_gpf
+
+.macro m_save_regs
+    pushq %rax
+    pushq %rcx
+    pushq %rdx
+    pushq %rsi
+    pushq %rdi
+    pushq %r8
+    pushq %r9
+    pushq %r10
+    pushq %r11
+.endm
+
+.macro m_restore_regs
+    popq %r11
+    popq %r10
+    popq %r9
+    popq %r8
+    popq %rdi
+    popq %rsi
+    popq %rdx
+    popq %rcx
+    popq %rax
+.endm
+
 # apply the ucode passed in RDI
 # rdtsc(p) difference is stored in RAX
 # use a macro instead of a function to reduce complex instructions like call/ret
@@ -42,7 +69,7 @@ read_msr_stub:
     lea ucode_patch_address(%rip), %r10
     movl 0(%r10), %r10d
     # TODO: emulator does not support rdtscp
-    rdtsc
+    rdtscp
     shl $32, %rdx
     or %rdx, %rax
     mov %rax, %r11
@@ -55,11 +82,13 @@ read_msr_stub:
     # update address, high part
     shr $32, %rdx
     wrmsr
+    mov %rax, %r9
 
-    rdtsc
+    rdtscp
     shl $32, %rdx
     or %rdx, %rax
     sub %r11, %rax
+    movq %r9, (%rsi)
 .endm
 
     .global apply_ucode_simple
@@ -79,7 +108,41 @@ apply_ucode_restore:
     mov %r9, %rax
     ret
 
+    .global read_idt_position
+    .type read_idt_position, @function
+read_idt_position:
+    lea idt_structure_addr(%rip), %rax
+    sidt (%rax)
+    ret
+
+    .global write_idt_position
+    .type write_idt_position, @function
+write_idt_position:
+    lea idt_structure_addr(%rip), %rax
+    lidt (%rax)
+    ret
+
+    .extern log_panic
+
+    .global gpf_handler
+    .type gpf_handler, @function
+gpf_handler:
+    mov 8(%rsp), %rax
+    add $2, %rax
+    mov %rax, 8(%rsp)
+    mov $0xDEAD, %rax
+    add $8, %rsp
+    iretq
+
 .extern original_ucode
+
+
+    .section .data
+    .align 8
+gpf_backup:
+    .space 8
+idt_structure:
+    .space 10
 
 # Constant pool section
     .section .rodata
@@ -94,3 +157,8 @@ original_ucode_s:
     .align 4
 ucode_patch_address:
     .long 0xc0010020
+    .align 8
+idt_structure_addr:
+    .quad idt_structure
+gpf_backup_addr:
+    .quad gpf_backup
