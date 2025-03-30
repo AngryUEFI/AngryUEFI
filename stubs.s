@@ -48,9 +48,23 @@ read_msr_stub:
     pushq %r9
     pushq %r10
     pushq %r11
+
+    pushq %rbx
+    pushq %rbp
+    pushq %r12
+    pushq %r13
+    pushq %r14
+    pushq %r15
 .endm
 
 .macro m_restore_regs
+    popq %r15
+    popq %r14
+    popq %r13
+    popq %r12
+    popq %rbp
+    popq %rbx
+
     popq %r11
     popq %r10
     popq %r9
@@ -109,6 +123,53 @@ apply_ucode_restore:
     lea original_ucode_s(%rip), %rdi
     m_apply_ucode
     mov %r9, %rax
+    ret
+
+    .global apply_ucode_execute_machine_code_simple
+    .type apply_ucode_execute_machine_code_simple, @function
+apply_ucode_execute_machine_code_simple:
+    m_save_regs
+    # backup the address of meta data into R8
+    mov %rdx, %r8
+    m_apply_ucode
+    # r9 holds the value potentially overwritten by the GPF handler
+    movq %r9, (%rsi)
+    # copy return values to metadata struct
+    movq %r9, 56(%r8)
+    movq %rax, 64(%r8)
+    cmp $0xdead, %r9w
+    je l_apply_ucode_execute_machine_code_simple_ret
+    mov %r8, %rax
+    movq 32(%r8), %r8
+    call %r8
+
+l_apply_ucode_execute_machine_code_simple_ret:
+    m_restore_regs
+    ret
+
+    .global apply_ucode_execute_machine_code_restore
+    .type apply_ucode_execute_machine_code_restore, @function
+apply_ucode_execute_machine_code_restore:
+    m_save_regs
+    # backup the address of meta data into R8
+    mov %rdx, %r8
+    m_apply_ucode
+    # r9 holds the value potentially overwritten by the GPF handler
+    movq %r9, (%rsi)
+
+    # copy return values to metadata struct
+    movq %r9, 56(%r8)
+    movq %rax, 64(%r8)
+    cmp $0xdead, %r9w
+    je l_apply_ucode_execute_machine_code_restore_ret
+    mov %r8, %rax
+    movq 32(%r8), %r8
+    call %r8
+
+    lea original_ucode_s(%rip), %rdi
+    m_apply_ucode
+l_apply_ucode_execute_machine_code_restore_ret:
+    m_restore_regs
     ret
 
     .global read_idt_position

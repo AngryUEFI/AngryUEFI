@@ -52,6 +52,12 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
         case MSG_APPLYUCODE:
             handle_apply_ucode(message + payload_offset, message_length - payload_offset, ctx);
             break;
+        case MSG_APPLYUCODEEXCUTETEST:
+            handle_apply_ucode_execute_test(message + payload_offset, message_length - payload_offset, ctx);
+            break;
+        case MSG_SENDMACHINECODE:
+            handle_send_machine_code(message + payload_offset, message_length - payload_offset, ctx);
+            break;
         case MSG_READMSR:
             handle_read_msr(message + payload_offset, message_length - payload_offset, ctx);
             break;

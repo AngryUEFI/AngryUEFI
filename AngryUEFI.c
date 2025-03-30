@@ -70,7 +70,7 @@ EFI_STATUS send_message(void* message, UINTN message_size, ConnectionContext* ct
 
     // Wait until the transmit completes.
     while (TxToken.CompletionToken.Status == EFI_NOT_READY) {
-        gBS->Stall(100000); // 100ms
+        gBS->Stall(1000); // 1ms
     }
     if (EFI_ERROR(TxToken.CompletionToken.Status)) {
         FormatPrintDebug(L"Error: TCP Transmit completed with error: %r\n", TxToken.CompletionToken.Status);
@@ -126,7 +126,7 @@ static EFI_STATUS receive_chunk(void* chunk, UINTN chunk_capacity, UINTN* chunk_
 
     // Wait until the receive completes.
     while (RxToken.CompletionToken.Status == EFI_NOT_READY) {
-        gBS->Stall(100000); // 100ms
+        gBS->Stall(1000); // 1ms
     }
 
     if (RxToken.CompletionToken.Status == 0x8000000000000068uLL) {
@@ -375,7 +375,7 @@ TcpEchoServer(
 
         // Wait (busy-wait loop) until a connection is accepted.
         while (ListenToken.CompletionToken.Status == EFI_NOT_READY) {
-            gBS->Stall(100000); // stall 100ms
+            gBS->Stall(1000); // stall 1ms
         }
         if (EFI_ERROR(ListenToken.CompletionToken.Status)) {
             FormatPrint(L"Error: Listen token completed with error: %r\n", ListenToken.CompletionToken.Status);

@@ -17,8 +17,13 @@
 #define ORIGINAL_UCODE_LEN ucode_original_0x17_0x71_len
 
 UcodeContainer ucodes[UCODE_SLOTS] = {0};
+MachineCodeContainer machine_codes[MACHINE_CODE_SLOTS] = {0};
 
 UINT8* original_ucode = NULL;
+
+static MachineCodeMetaData machine_code_meta_data = {0};
+UINT8 result_buffer[RESULT_BUFFER_SIZE] = {0};
+UINT8 machine_code_scratch_space[MACHINE_CODE_SCRATCH_SPACE_SIZE] = {0};
 
 // we alloc space for the update and copy it there even though the
 // original ucode would suffice
@@ -32,6 +37,8 @@ void ensure_slot_0() {
 
         original_ucode = ucodes[0].ucode;
     }
+
+    // TODO: copy hardcoded machine code to slot 0
 }
 
 UINT64* get_idt_address() {
@@ -84,7 +91,7 @@ void flip_bit(UINT8* ucode, UINT64 ucode_length, UINT32 position) {
 EFI_STATUS handle_flip_bits(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     PrintDebug(L"Handling FLIPBITS message.\n");
     if (payload_length < 8) {
-        FormatPrintDebug(L"FLIPBITS is too short, need at least 8 Bytes, got %u.\n", payload_length);
+        FormatPrint(L"FLIPBITS is too short, need at least 8 Bytes, got %u.\n", payload_length);
         send_status(0x1, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
@@ -93,12 +100,12 @@ EFI_STATUS handle_flip_bits(UINT8* payload, UINTN payload_length, ConnectionCont
     UINT32 num_flips = ((UINT32*)payload)[1];
 
     if (target_slot > UCODE_SLOTS - 1) {
-        FormatPrintDebug(L"Invalid target slot, got %u, max %u.\n", target_slot, UCODE_SLOTS - 1);
+        FormatPrint(L"Invalid target slot, got %u, max %u.\n", target_slot, UCODE_SLOTS - 1);
         send_status(0x2, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
     if (ucodes[target_slot].ucode == NULL) {
-        FormatPrintDebug(L"Slot %u is empty\n", target_slot);
+        FormatPrint(L"Slot %u is empty\n", target_slot);
         send_status(0x3, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
@@ -125,7 +132,7 @@ EFI_STATUS handle_flip_bits(UINT8* payload, UINTN payload_length, ConnectionCont
 EFI_STATUS handle_apply_ucode(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     PrintDebug(L"Handling MSG_APPLYUCODE message.\n");
     if (payload_length < 8) {
-        FormatPrintDebug(L"MSG_APPLYUCODE is too short, need at least 8 Bytes, got %u.\n", payload_length);
+        FormatPrint(L"MSG_APPLYUCODE is too short, need at least 8 Bytes, got %u.\n", payload_length);
         send_status(0x1, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
@@ -133,7 +140,7 @@ EFI_STATUS handle_apply_ucode(UINT8* payload, UINTN payload_length, ConnectionCo
     UINT32 target_slot = ((UINT32*)payload)[0];
     UINT32 options = ((UINT32*)payload)[1];
     if (ucodes[target_slot].ucode == NULL || ucodes[target_slot].length == 0) {
-        FormatPrintDebug(L"Target slot %u is empty.\n", target_slot);
+        FormatPrint(L"Target slot %u is empty.\n", target_slot);
         send_status(0x2, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
@@ -169,15 +176,128 @@ EFI_STATUS handle_apply_ucode(UINT8* payload, UINTN payload_length, ConnectionCo
 
     EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_UCODERESPONSE, payload_buffer, response_size, TRUE);
     if (EFI_ERROR(Status)) {
-        FormatPrintDebug(L"Unable to construct message: %r.\n", Status);
+        FormatPrint(L"Unable to construct message: %r.\n", Status);
         return Status;
     }
 
     Status = send_message(response_buffer, response_size + HEADER_SIZE, ctx);
     if (EFI_ERROR(Status)) {
-        FormatPrintDebug(L"Unable to send message: %r.\n", Status);
+        FormatPrint(L"Unable to send message: %r.\n", Status);
         return Status;
     }
+
+    return EFI_SUCCESS;
+}
+
+EFI_STATUS handle_apply_ucode_execute_test(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
+    PrintDebug(L"Handling MSG_APPLYUCODEEXCUTETEST message.\n");
+    if (payload_length < 12) {
+        FormatPrint(L"MSG_APPLYUCODEEXCUTETEST is too short, need at least 12 Bytes, got %u.\n", payload_length);
+        send_status(0x1, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    UINT32 target_ucode_slot = ((UINT32*)payload)[0];
+    UINT32 options = ((UINT32*)payload)[2];
+    if (ucodes[target_ucode_slot].ucode == NULL || ucodes[target_ucode_slot].length == 0) {
+        FormatPrint(L"Target ucode slot %u is empty.\n", target_ucode_slot);
+        send_status(0x2, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+
+    UINT32 target_machine_code_slot = ((UINT32*)payload)[1];
+    if (machine_codes[target_machine_code_slot].machine_code == NULL || machine_codes[target_machine_code_slot].length == 0) {
+        FormatPrint(L"Target machine code slot %u is empty.\n", target_machine_code_slot);
+        send_status(0x3, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    machine_code_meta_data.result_buffer = result_buffer;
+    machine_code_meta_data.result_buffer_len = RESULT_BUFFER_SIZE;
+    machine_code_meta_data.scratch_space = machine_code_scratch_space;
+    machine_code_meta_data.scratch_space_len = MACHINE_CODE_SCRATCH_SPACE_SIZE;
+    machine_code_meta_data.current_machine_code_slot_address = machine_codes[target_machine_code_slot].machine_code;
+    machine_code_meta_data.current_microcode_slot_address = ucodes[target_ucode_slot].ucode;
+    machine_code_meta_data.core_id = 0; // TODO
+    machine_code_meta_data.ret_gpf_value = 0;
+    machine_code_meta_data.ret_rdtsc_value = 0;
+
+
+    UINT8* ucode = ucodes[target_ucode_slot].ucode;
+    UINT64 ucode_len = ucodes[target_ucode_slot].length;
+    UINT64 intterrupt_value = 0ull;
+    // generated by iterating the entire ucode
+    // this should fill the cache with this update
+    // the value is passed to the apply ucode functions
+    // so the compiler can not optimze them out
+    UINT64 dummy = 0xdeadbeefdeadc0deull;
+    for (UINT64 i = 0; i < ucode_len; i += 8) {
+        for (UINT64 j = 0; j < 8; j++) {
+            UINT8 b = ucode[i + j];
+            dummy ^= ((UINT64)b) << j;
+        }
+    }
+    intterrupt_value = dummy;
+    if ((options & 0x01) == 0x01) {
+        PrintDebug(L"Restoring after ucode.\n");
+        apply_ucode_execute_machine_code_simple(ucode, &intterrupt_value, &machine_code_meta_data);
+    } else {
+        PrintDebug(L"NOT Restoring after ucode.\n");
+        apply_ucode_execute_machine_code_simple(ucode, &intterrupt_value, &machine_code_meta_data);
+    }
+
+    UINT64* payload_u64 = (UINT64*)payload_buffer;
+    payload_u64[0] = machine_code_meta_data.ret_rdtsc_value;
+    payload_u64[1] = machine_code_meta_data.ret_gpf_value;
+    payload_u64[2] = machine_code_meta_data.result_buffer_len;
+    CopyMem(payload_buffer + 24, machine_code_meta_data.result_buffer, machine_code_meta_data.result_buffer_len);
+    const UINTN response_size = 24 + 1024;
+
+    EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_UCODEEXECUTETESTRESPONSE, payload_buffer, response_size, TRUE);
+    if (EFI_ERROR(Status)) {
+        FormatPrint(L"Unable to construct message: %r.\n", Status);
+        return Status;
+    }
+
+    Status = send_message(response_buffer, response_size + HEADER_SIZE, ctx);
+    if (EFI_ERROR(Status)) {
+        FormatPrint(L"Unable to send message: %r.\n", Status);
+        return Status;
+    }
+
+    return EFI_SUCCESS;
+}
+
+EFI_STATUS handle_send_machine_code(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
+    PrintDebug(L"Handling SENDMACHINECODE message.\n");
+    if (payload_length < 8) {
+        FormatPrint(L"SENDMACHINECODE is too short, need at least 8 Bytes, got %u.\n", payload_length);
+        send_status(0x1, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    UINT32 target_slot = ((UINT32*)payload)[0];
+    UINT32 machine_code_size = ((UINT32*)payload)[1];
+
+    if (target_slot > MACHINE_CODE_SLOTS - 1) {
+        FormatPrint(L"Invalid target slot, got %u, max %u.\n", target_slot, MACHINE_CODE_SLOTS - 1);
+        send_status(0x2, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    if (machine_codes[target_slot].machine_code == NULL) {
+        machine_codes[target_slot].machine_code = AllocateZeroPool(MACHINE_CODE_SIZE);
+        if (machine_codes[target_slot].machine_code == NULL) {
+            FormatPrint(L"Unable to allocate memory for machine_code.\n");
+            send_status(0x3, FormatBuffer, ctx);
+            return EFI_INVALID_PARAMETER;
+        }
+    }
+    machine_codes[target_slot].length = machine_code_size;
+    CopyMem(machine_codes[target_slot].machine_code, payload + 8, machine_code_size);
+    
+    send_status(0x0, NULL, ctx);
 
     return EFI_SUCCESS;
 }
@@ -185,7 +305,7 @@ EFI_STATUS handle_apply_ucode(UINT8* payload, UINTN payload_length, ConnectionCo
 EFI_STATUS handle_read_msr(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     PrintDebug(L"Handling MSG_READMSR message.\n");
     if (payload_length < 4) {
-        FormatPrintDebug(L"MSG_READMSR is too short, need at least 4 Bytes, got %u.\n", payload_length);
+        FormatPrint(L"MSG_READMSR is too short, need at least 4 Bytes, got %u.\n", payload_length);
         send_status(0x1, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
@@ -200,13 +320,13 @@ EFI_STATUS handle_read_msr(UINT8* payload, UINTN payload_length, ConnectionConte
 
     EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_MSRRESPONSE, (UINT8*)outputs, sizeof(outputs), TRUE);
     if (EFI_ERROR(Status)) {
-        FormatPrintDebug(L"Unable to construct message: %r.\n", Status);
+        FormatPrint(L"Unable to construct message: %r.\n", Status);
         return Status;
     }
 
     Status = send_message(response_buffer, sizeof(outputs) + HEADER_SIZE, ctx);
     if (EFI_ERROR(Status)) {
-        FormatPrintDebug(L"Unable to send message: %r.\n", Status);
+        FormatPrint(L"Unable to send message: %r.\n", Status);
         return Status;
     }
 
