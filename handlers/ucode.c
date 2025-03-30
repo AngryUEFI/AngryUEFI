@@ -162,15 +162,18 @@ EFI_STATUS handle_apply_ucode(UINT8* payload, UINTN payload_length, ConnectionCo
         ret = apply_ucode_simple(ucode, &intterrupt_value);
     }
 
-    *(UINT64*)payload_buffer = ret;
+    UINT64* payload_u64 = (UINT64*)payload_buffer;
+    payload_u64[0] = ret;
+    payload_u64[1] = intterrupt_value;
+    const UINTN response_size = 16;
 
-    EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_UCODERESPONSE, payload_buffer, 8, TRUE);
+    EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_UCODERESPONSE, payload_buffer, response_size, TRUE);
     if (EFI_ERROR(Status)) {
         FormatPrintDebug(L"Unable to construct message: %r.\n", Status);
         return Status;
     }
 
-    Status = send_message(response_buffer, 8 + HEADER_SIZE, ctx);
+    Status = send_message(response_buffer, response_size + HEADER_SIZE, ctx);
     if (EFI_ERROR(Status)) {
         FormatPrintDebug(L"Unable to send message: %r.\n", Status);
         return Status;

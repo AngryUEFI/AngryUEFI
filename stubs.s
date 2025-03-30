@@ -69,7 +69,7 @@ read_msr_stub:
     lea ucode_patch_address(%rip), %r10
     movl 0(%r10), %r10d
     # TODO: emulator does not support rdtscp
-    rdtscp
+    rdtsc
     shl $32, %rdx
     or %rdx, %rax
     mov %rax, %r11
@@ -84,23 +84,26 @@ read_msr_stub:
     wrmsr
     mov %rax, %r9
 
-    rdtscp
+    rdtsc
     shl $32, %rdx
     or %rdx, %rax
     sub %r11, %rax
-    movq %r9, (%rsi)
 .endm
 
     .global apply_ucode_simple
     .type apply_ucode_simple, @function
 apply_ucode_simple:
     m_apply_ucode
+    # r9 holds the value potentially overwritten by the GPF handler
+    movq %r9, (%rsi)
     ret
 
     .global apply_ucode_restore
     .type apply_ucode_restore, @function
 apply_ucode_restore:
     m_apply_ucode
+    # r9 holds the value potentially overwritten by the GPF handler
+    movq %r9, (%rsi)
 
     mov %rax, %r9
     lea original_ucode_s(%rip), %rdi
