@@ -13,8 +13,7 @@
 #include "stubs.h"
 #include "smp.h"
 #include "ucode.h"
-
-static MachineCodeMetaData machine_code_meta_data[MAX_CORE_COUNT] = {0};
+#include "cores.h"
 
 // wrappers to change EFIAPI calling convention to native convention
 static EFIAPI void apply_ucode_execute_machine_code_restore_efi_wrapper(void* buffer) {
@@ -31,8 +30,8 @@ static EFIAPI void apply_ucode_execute_machine_code_simple_efi_wrapper(void* buf
 EFI_STATUS handle_apply_ucode_execute_test(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     PrintDebug(L"Handling MSG_APPLYUCODEEXCUTETEST message.\n");
     EFI_STATUS status = EFI_SUCCESS;
-    if (payload_length < 16) {
-        FormatPrint(L"MSG_APPLYUCODEEXCUTETEST is too short, need at least 16 Bytes, got %u.\n", payload_length);
+    if (payload_length < 20) {
+        FormatPrint(L"MSG_APPLYUCODEEXCUTETEST is too short, need at least 20 Bytes, got %u.\n", payload_length);
         send_status(0x1, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
@@ -58,12 +57,6 @@ EFI_STATUS handle_apply_ucode_execute_test(UINT8* payload, UINTN payload_length,
     if (target_core_id > get_available_cores() - 1 || target_core_id > MAX_CORE_COUNT - 1) {
         FormatPrint(L"Target core id %u is too high, got %u cores, max %u supported.\n", target_core_id, get_available_cores(), MAX_CORE_COUNT);
         send_status(0x4, FormatBuffer, ctx);
-        return EFI_INVALID_PARAMETER;
-    }
-
-    if (timeout != 0) {
-        FormatPrint(L"Due to no available TimerLib timeout is not supported.\n");
-        send_status(0x5, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
 
@@ -182,22 +175,11 @@ EFI_STATUS handle_send_machine_code(UINT8* payload, UINTN payload_length, Connec
     return EFI_SUCCESS;
 }
 
-static void allocate_core_contexts() {
-    for (UINTN i = 0; i < MAX_CORE_COUNT; i++) {
-        MachineCodeMetaData* current = &machine_code_meta_data[i];
-        current->result_buffer = AllocateZeroPool(RESULT_BUFFER_SIZE);
-        current->result_buffer_len = RESULT_BUFFER_SIZE;
-        current->scratch_space = AllocateZeroPool(MACHINE_CODE_SCRATCH_SPACE_SIZE);
-        current->scratch_space_len = MACHINE_CODE_SCRATCH_SPACE_SIZE;
-        current->core_id = i;
-    }
-}
-
 static void ensure_machine_code_slot_0() {
     // TODO: copy hardcoded machine code to slot 0
 }
 
 void init_ucode_execute() {
-    allocate_core_contexts();
     ensure_machine_code_slot_0();
+    init_cores();
 }

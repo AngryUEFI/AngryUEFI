@@ -3,7 +3,7 @@
 
 #include <Base.h>
 
-#include "handlers/ucode_execute.h"
+#include "handlers/cores.h"
 
 UINT64 test_stub(UINT64 a, UINT64 b);
 UINT64 read_msr_stub(UINT32 target_msr);

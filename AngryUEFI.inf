@@ -29,6 +29,7 @@
   handlers/debug.c
   handlers/ucode.c
   handlers/ucode_execute.c
+  handlers/cores.c
 
 [Packages]
   MdePkg/MdePkg.dec
