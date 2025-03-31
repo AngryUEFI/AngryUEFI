@@ -173,6 +173,27 @@ l_apply_ucode_execute_machine_code_restore_ret:
     m_restore_regs
     ret
 
+    .global get_tsc
+    .type get_tsc, @function
+get_tsc:
+    rdtsc
+    shl $32, %rdx
+    or %rdx, %rax
+    ret
+
+    .global interlocked_compare_exchange_64
+    .type interlocked_compare_exchange_64, @function
+interlocked_compare_exchange_64:
+    #   RDI = mem
+    #   RSI = compare_value
+    #   RDX = exchange_value
+
+    movq %rsi, %rax
+    lock cmpxchgq %rdx, (%rdi)
+    # (%rdi) == %rax -> (%rdi) = %rdx else %rax = (%rdi)
+    # sucess -> get back compare_value, else get back current *mem
+    ret
+
     .global read_idt_position
     .type read_idt_position, @function
 read_idt_position:
