@@ -11,6 +11,7 @@
 
 #include "Protocol.h"
 #include "AngryUEFI.h"
+#include "smp.h"
 
 EFI_STATUS handle_ping(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     PrintDebug(L"Handling PING message.\n");
@@ -127,6 +128,27 @@ EFI_STATUS handle_reboot(UINT8* payload, UINTN payload_length, ConnectionContext
         gRT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
     else
         gRT->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
+
+    return EFI_SUCCESS;
+}
+
+EFI_STATUS handle_get_core_count(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
+    PrintDebug(L"Handling MSG_GETCORECOUNT message.\n");
+
+    UINTN core_count = get_available_cores();
+
+    *(UINT64*)payload_buffer = core_count;
+    EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_CORECOUNTRESPONSE, payload_buffer, 8, TRUE);
+    if (EFI_ERROR(Status)) {
+        FormatPrintDebug(L"Unable to construct message: %r.\n", Status);
+        return Status;
+    }
+
+    Status = send_message(response_buffer, 8 + HEADER_SIZE, ctx);
+    if (EFI_ERROR(Status)) {
+        FormatPrintDebug(L"Unable to send message: %r.\n", Status);
+        return Status;
+    }
 
     return EFI_SUCCESS;
 }

@@ -82,8 +82,7 @@ read_msr_stub:
 .macro m_apply_ucode
     lea ucode_patch_address(%rip), %r10
     movl 0(%r10), %r10d
-    # TODO: emulator does not support rdtscp
-    rdtsc
+    rdtscp
     shl $32, %rdx
     or %rdx, %rax
     mov %rax, %r11
@@ -98,7 +97,7 @@ read_msr_stub:
     wrmsr
     mov %rax, %r9
 
-    rdtsc
+    rdtscp
     shl $32, %rdx
     or %rdx, %rax
     sub %r11, %rax
@@ -130,11 +129,12 @@ apply_ucode_restore:
 apply_ucode_execute_machine_code_simple:
     m_save_regs
     # backup the address of meta data into R8
-    mov %rdx, %r8
+    mov %rdi, %r8
+    # set ucode update address from meta data
+    movq 40(%rdi), %rdi
     m_apply_ucode
-    # r9 holds the value potentially overwritten by the GPF handler
-    movq %r9, (%rsi)
     # copy return values to metadata struct
+    # r9 holds the value potentially overwritten by the GPF handler
     movq %r9, 56(%r8)
     movq %rax, 64(%r8)
     cmp $0xdead, %r9w
@@ -152,12 +152,13 @@ l_apply_ucode_execute_machine_code_simple_ret:
 apply_ucode_execute_machine_code_restore:
     m_save_regs
     # backup the address of meta data into R8
-    mov %rdx, %r8
+    mov %rdi, %r8
+    # set ucode update address from meta data
+    movq 40(%rdi), %rdi
     m_apply_ucode
-    # r9 holds the value potentially overwritten by the GPF handler
-    movq %r9, (%rsi)
 
     # copy return values to metadata struct
+    # r9 holds the value potentially overwritten by the GPF handler
     movq %r9, 56(%r8)
     movq %rax, 64(%r8)
     cmp $0xdead, %r9w

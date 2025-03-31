@@ -21,6 +21,7 @@
 #include "AngryUEFI.h"
 #include "stubs.h"
 #include "handlers/ucode.h"
+#include "smp.h"
 
 UINT8 receive_buffer[RECEIVE_BUFFER_SIZE];
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *TextOutput;
@@ -219,7 +220,7 @@ static EFI_STATUS receive_messages(EFI_TCP4_PROTOCOL* IncomingTcp4) {
 }
 
 EFI_STATUS static
-TcpEchoServer(
+AngryUEFI(
   IN EFI_HANDLE           ImageHandle,
   IN EFI_SYSTEM_TABLE     *SystemTable
 ) {
@@ -243,6 +244,8 @@ TcpEchoServer(
 
     Print(L"Hello UEFI!\n");
     FormatPrintDebug(L"Hello %u Format!\n", 42);
+
+    init_smp();
 
     UINT64 ret = test_stub(0x123456789ABCDEF0ull, 0x0FEDCBA987654321ull);
     UINT64 expected = (0x123456789ABCDEF0ull + 0x0FEDCBA987654321ull) ^ 0xdeadbeefdeadc0deull;
@@ -432,5 +435,5 @@ EFI_STATUS EFIAPI UefiMain
   IN EFI_HANDLE        ImageHandle,
   IN EFI_SYSTEM_TABLE  *SystemTable
 ) {
-    return TcpEchoServer(ImageHandle, SystemTable);
+    return AngryUEFI(ImageHandle, SystemTable);
 }

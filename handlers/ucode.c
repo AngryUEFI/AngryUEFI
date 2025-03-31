@@ -12,6 +12,8 @@
 #include "AngryUEFI.h"
 #include "stubs.h"
 #include "data/ucode-original-0x17-0x71.h"
+#include "smp.h"
+#include "utils.h"
 
 #define ORIGINAL_UCODE ucode_original_0x17_0x71
 #define ORIGINAL_UCODE_LEN ucode_original_0x17_0x71_len
@@ -21,9 +23,7 @@ MachineCodeContainer machine_codes[MACHINE_CODE_SLOTS] = {0};
 
 UINT8* original_ucode = NULL;
 
-static MachineCodeMetaData machine_code_meta_data = {0};
-UINT8 result_buffer[RESULT_BUFFER_SIZE] = {0};
-UINT8 machine_code_scratch_space[MACHINE_CODE_SCRATCH_SPACE_SIZE] = {0};
+static MachineCodeMetaData machine_code_meta_data[MAX_CORE_COUNT] = {0};
 
 // we alloc space for the update and copy it there even though the
 // original ucode would suffice
@@ -39,6 +39,17 @@ void ensure_slot_0() {
     }
 
     // TODO: copy hardcoded machine code to slot 0
+}
+
+void allocate_core_contexts() {
+    for (UINTN i = 0; i < MAX_CORE_COUNT; i++) {
+        MachineCodeMetaData* current = &machine_code_meta_data[i];
+        current->result_buffer = AllocateZeroPool(RESULT_BUFFER_SIZE);
+        current->result_buffer_len = RESULT_BUFFER_SIZE;
+        current->scratch_space = AllocateZeroPool(MACHINE_CODE_SCRATCH_SPACE_SIZE);
+        current->scratch_space_len = MACHINE_CODE_SCRATCH_SPACE_SIZE;
+        current->core_id = i;
+    }
 }
 
 UINT64* get_idt_address() {
@@ -189,47 +200,70 @@ EFI_STATUS handle_apply_ucode(UINT8* payload, UINTN payload_length, ConnectionCo
     return EFI_SUCCESS;
 }
 
+// wrapper to change EFIAPI calling convention to native convention
+static EFIAPI void apply_ucode_execute_machine_code_restore_efi_wrapper(void* buffer) {
+    apply_ucode_execute_machine_code_restore(buffer);
+    ((MachineCodeMetaData*)buffer)->execution_done = 1;
+}
+
+static EFIAPI void apply_ucode_execute_machine_code_simple_efi_wrapper(void* buffer) {
+    apply_ucode_execute_machine_code_simple(buffer);
+    ((MachineCodeMetaData*)buffer)->execution_done = 1;
+}
+
 EFI_STATUS handle_apply_ucode_execute_test(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     PrintDebug(L"Handling MSG_APPLYUCODEEXCUTETEST message.\n");
-    if (payload_length < 12) {
-        FormatPrint(L"MSG_APPLYUCODEEXCUTETEST is too short, need at least 12 Bytes, got %u.\n", payload_length);
+    EFI_STATUS status = EFI_SUCCESS;
+    if (payload_length < 16) {
+        FormatPrint(L"MSG_APPLYUCODEEXCUTETEST is too short, need at least 16 Bytes, got %u.\n", payload_length);
         send_status(0x1, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
+    UINT32* payload_u32 = (UINT32*)payload;
 
-    UINT32 target_ucode_slot = ((UINT32*)payload)[0];
-    UINT32 options = ((UINT32*)payload)[2];
+    UINT32 target_ucode_slot = payload_u32[0];
+    UINT32 target_machine_code_slot = payload_u32[1];
+    UINT32 target_core_id = payload_u32[2];
+    UINT32 timeout = payload_u32[3];
+    UINT32 options = payload_u32[4];
     if (ucodes[target_ucode_slot].ucode == NULL || ucodes[target_ucode_slot].length == 0) {
         FormatPrint(L"Target ucode slot %u is empty.\n", target_ucode_slot);
         send_status(0x2, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
 
-
-    UINT32 target_machine_code_slot = ((UINT32*)payload)[1];
     if (machine_codes[target_machine_code_slot].machine_code == NULL || machine_codes[target_machine_code_slot].length == 0) {
         FormatPrint(L"Target machine code slot %u is empty.\n", target_machine_code_slot);
         send_status(0x3, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
 
-    machine_code_meta_data.result_buffer = result_buffer;
-    machine_code_meta_data.result_buffer_len = RESULT_BUFFER_SIZE;
-    machine_code_meta_data.scratch_space = machine_code_scratch_space;
-    machine_code_meta_data.scratch_space_len = MACHINE_CODE_SCRATCH_SPACE_SIZE;
-    machine_code_meta_data.current_machine_code_slot_address = machine_codes[target_machine_code_slot].machine_code;
-    machine_code_meta_data.current_microcode_slot_address = ucodes[target_ucode_slot].ucode;
-    machine_code_meta_data.core_id = 0; // TODO
-    machine_code_meta_data.ret_gpf_value = 0;
-    machine_code_meta_data.ret_rdtsc_value = 0;
+    if (target_core_id > get_available_cores() - 1 || target_core_id > MAX_CORE_COUNT - 1) {
+        FormatPrint(L"Target core id %u is too high, got %u cores, max %u supported.\n", target_core_id, get_available_cores(), MAX_CORE_COUNT);
+        send_status(0x4, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
 
+    if (timeout != 0) {
+        FormatPrint(L"Due to no available TimerLib timeout is not supported.\n");
+        send_status(0x5, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    MachineCodeMetaData* selected_meta_data = &machine_code_meta_data[target_core_id];
+    selected_meta_data->current_machine_code_slot_address = machine_codes[target_machine_code_slot].machine_code;
+    selected_meta_data->current_microcode_slot_address = ucodes[target_ucode_slot].ucode;
+    selected_meta_data->ret_gpf_value = 0;
+    selected_meta_data->ret_rdtsc_value = 0;
+    selected_meta_data->execution_done = 0;
+    ZeroMem(selected_meta_data->result_buffer, selected_meta_data->result_buffer_len);
 
     UINT8* ucode = ucodes[target_ucode_slot].ucode;
     UINT64 ucode_len = ucodes[target_ucode_slot].length;
-    UINT64 intterrupt_value = 0ull;
+
     // generated by iterating the entire ucode
     // this should fill the cache with this update
-    // the value is passed to the apply ucode functions
+    // the value is put into the meta data
     // so the compiler can not optimze them out
     UINT64 dummy = 0xdeadbeefdeadc0deull;
     for (UINT64 i = 0; i < ucode_len; i += 8) {
@@ -238,21 +272,49 @@ EFI_STATUS handle_apply_ucode_execute_test(UINT8* payload, UINTN payload_length,
             dummy ^= ((UINT64)b) << j;
         }
     }
-    intterrupt_value = dummy;
-    if ((options & 0x01) == 0x01) {
-        PrintDebug(L"Restoring after ucode.\n");
-        apply_ucode_execute_machine_code_simple(ucode, &intterrupt_value, &machine_code_meta_data);
+    selected_meta_data->ret_gpf_value = dummy;
+
+    UINT64 flags = 0ull;
+    if (target_core_id == 0) {
+        if ((options & 0x01) == 0x01) {
+            apply_ucode_execute_machine_code_restore(selected_meta_data);
+        } else {
+            apply_ucode_execute_machine_code_simple(selected_meta_data);
+        }
     } else {
-        PrintDebug(L"NOT Restoring after ucode.\n");
-        apply_ucode_execute_machine_code_simple(ucode, &intterrupt_value, &machine_code_meta_data);
+        EFI_EVENT event = NULL;
+        UINT64 tsc1 = get_tsc();
+        if ((options & 0x01) == 0x01) {
+            status = start_on_core(target_core_id, apply_ucode_execute_machine_code_restore_efi_wrapper, selected_meta_data, &event, timeout);
+        } else {
+            status = start_on_core(target_core_id, apply_ucode_execute_machine_code_simple_efi_wrapper, selected_meta_data, &event, timeout);
+        }
+
+        if (status != EFI_SUCCESS) {
+            FormatPrint(L"Unable to start task on core %u: %r.\n", target_core_id, status);
+            send_status(0x6, FormatBuffer, ctx);
+            return status;
+        }
+
+        while (selected_meta_data->execution_done != 1) {
+            if (timeout != 0 && get_ms_diff(tsc1, get_tsc()) > timeout) {
+                // set LSB to indicate timeout was reached
+                flags |= 0x1;
+                break;
+            }
+            CpuPause(); // spin loop
+        }
+
+        close_event(event);
     }
 
     UINT64* payload_u64 = (UINT64*)payload_buffer;
-    payload_u64[0] = machine_code_meta_data.ret_rdtsc_value;
-    payload_u64[1] = machine_code_meta_data.ret_gpf_value;
-    payload_u64[2] = machine_code_meta_data.result_buffer_len;
-    CopyMem(payload_buffer + 24, machine_code_meta_data.result_buffer, machine_code_meta_data.result_buffer_len);
-    const UINTN response_size = 24 + 1024;
+    payload_u64[0] = selected_meta_data->ret_rdtsc_value;
+    payload_u64[1] = selected_meta_data->ret_gpf_value;
+    payload_u64[2] = flags;
+    payload_u64[3] = selected_meta_data->result_buffer_len;
+    CopyMem(payload_buffer + 32, selected_meta_data->result_buffer, selected_meta_data->result_buffer_len);
+    const UINTN response_size = 32 + 1024;
 
     EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_UCODEEXECUTETESTRESPONSE, payload_buffer, response_size, TRUE);
     if (EFI_ERROR(Status)) {
@@ -408,4 +470,5 @@ void log_panic() {
 void init_ucode() {
     ensure_slot_0();
     InstallCustomGpfHandler();
+    allocate_core_contexts();
 }

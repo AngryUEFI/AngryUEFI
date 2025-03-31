@@ -25,6 +25,8 @@
   AngryUEFI.c
   Protocol.c
   stubs.s
+  smp.c
+  utils.c
   handlers/debug.c
   handlers/ucode.c
 
@@ -49,3 +51,4 @@
   gEfiSimpleTextInProtocolGuid
   gEfiTcp4ProtocolGuid
   gEfiTcp4ServiceBindingProtocolGuid
+  gEfiMpServiceProtocolGuid

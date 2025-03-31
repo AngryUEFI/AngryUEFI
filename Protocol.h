@@ -9,7 +9,7 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
 EFI_STATUS construct_message(UINT8* message_buffer, UINTN buffer_capacity, UINT32 message_type, UINT8* payload, UINTN payload_length, BOOLEAN last_message);
 EFI_STATUS send_status(UINT32 status_code, CHAR16* message, ConnectionContext* ctx);
 
-#define RESPONSE_PAYLOAD_SIZE 1024 + 24
+#define RESPONSE_PAYLOAD_SIZE 1024 + 32
 #define RESPONSE_BUFFER_SIZE RESPONSE_PAYLOAD_SIZE + 12 // 1024 Bytes Payload + 4 Bytes Length + 4 Bytes Metadata + 4 Bytes Message Type
 #define HEADER_SIZE 12
 
@@ -37,6 +37,7 @@ enum MessageType {
     MSG_APPLYUCODE = 0x141,
     MSG_APPLYUCODEEXCUTETEST = 0x151,
     MSG_READMSR = 0x201,
+    MSG_GETCORECOUNT = 0x211,
     MSG_SENDMACHINECODE = 0x301,
 
     MSG_STATUS = 0x80000000,
@@ -46,21 +47,7 @@ enum MessageType {
     MSG_UCODERESPONSE = 0x80000141,
     MSG_UCODEEXECUTETESTRESPONSE = 0x80000151,
     MSG_MSRRESPONSE = 0x80000201,
+    MSG_CORECOUNTRESPONSE = 0x80000211,
 };
-
-#pragma pack(push,1)
-typedef struct MachineCodeMetaData_s {
-    void* result_buffer;
-    UINT64 result_buffer_len;
-    void* scratch_space;
-    UINT64 scratch_space_len;
-    void* current_machine_code_slot_address;
-    void* current_microcode_slot_address;
-    UINT64 core_id;
-    UINT64 ret_gpf_value;
-    UINT64 ret_rdtsc_value;
-} MachineCodeMetaData;
-#pragma pack(pop)
-
 
 #endif /* PROTOCOL_H */
