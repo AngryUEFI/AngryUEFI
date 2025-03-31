@@ -26,9 +26,9 @@
   Protocol.c
   stubs.s
   smp.c
-  utils.c
   handlers/debug.c
   handlers/ucode.c
+  handlers/ucode_execute.c
 
 [Packages]
   MdePkg/MdePkg.dec

@@ -10,6 +10,7 @@
 #include "AngryUEFI.h"
 #include "handlers/debug.h"
 #include "handlers/ucode.h"
+#include "handlers/ucode_execute.h"
 
 UINT8 payload_buffer[RESPONSE_PAYLOAD_SIZE];
 UINT8 response_buffer[RESPONSE_BUFFER_SIZE];

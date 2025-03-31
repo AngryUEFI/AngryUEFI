@@ -141,7 +141,7 @@ apply_ucode_execute_machine_code_simple:
     je l_apply_ucode_execute_machine_code_simple_ret
     mov %r8, %rax
     movq 32(%r8), %r8
-    call %r8
+    call *%r8
 
 l_apply_ucode_execute_machine_code_simple_ret:
     m_restore_regs
@@ -165,7 +165,7 @@ apply_ucode_execute_machine_code_restore:
     je l_apply_ucode_execute_machine_code_restore_ret
     mov %r8, %rax
     movq 32(%r8), %r8
-    call %r8
+    call *%r8
 
     lea original_ucode_s(%rip), %rdi
     m_apply_ucode
