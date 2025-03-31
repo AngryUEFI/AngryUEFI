@@ -10,9 +10,13 @@ void init_cores();
 #define RESULT_BUFFER_SIZE 1*1024
 #define MACHINE_CODE_SCRATCH_SPACE_SIZE 4*1024
 
-EFI_STATUS hanle_start_core(UINT8* payload, UINTN payload_length, ConnectionContext* ctx);
-
 typedef struct CoreContext_s CoreContext;
+
+EFI_STATUS handle_start_core(UINT8* payload, UINTN payload_length, ConnectionContext* ctx);
+EFI_STATUS handle_get_core_status(UINT8* payload, UINTN payload_length, ConnectionContext* ctx);
+EFI_STATUS handle_get_core_count(UINT8* payload, UINTN payload_length, ConnectionContext* ctx);
+
+EFI_STATUS send_core_status(CoreContext* context, BOOLEAN is_last_message, ConnectionContext* ctx);
 
 // lock the context
 // will spin until lock is available
@@ -105,8 +109,8 @@ typedef struct CoreContext_s {
     // only C code will respect this
     // while a job is running, no locks should be acquired
     // and the job locks this structure
-    // when starting a core, lock this context
-    // before starting the actual loop function
+    // when starting a core, lock this context before
+    // starting the actual loop function
     // the main loop will unlock this context after it's init
     volatile UINT64 lock;
 } CoreContext;

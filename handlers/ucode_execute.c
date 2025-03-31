@@ -41,7 +41,7 @@ static EFI_STATUS check_job_parameters(JobParameters* job_parameters, Connection
         return EFI_INVALID_PARAMETER;
     }
 
-    if (job_parameters->core_id > MAX_CORE_COUNT) {
+    if (job_parameters->core_id >= MAX_CORE_COUNT) {
         FormatPrint(L"Core id %u is out of range, only max cores are supported.\n", job_parameters->core_id, MAX_CORE_COUNT);
         send_status(0x105, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
@@ -70,15 +70,16 @@ static EFI_STATUS acquire_core_lock(JobParameters* job_parameters, ConnectionCon
         send_status(0x201, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
-    FormatPrint(L"Got core lock.\n");
 
     if (context->ready != 1) {
+        unlock_context(context);
         FormatPrint(L"Core id %u is not ready to accept a job.\n", job_parameters->core_id);
         send_status(0x202, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
 
     if (context->job_queued == 1) {
+        unlock_context(context);
         FormatPrint(L"Core id %u already has a job queued.\n", job_parameters->core_id);
         send_status(0x203, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
@@ -139,7 +140,7 @@ static void write_job_infos(JobParameters* job_parameters, CoreContext* context)
     context->job_function_argument = context;
 }
 
-static EFI_STATUS construct_result_message(CoreContext* context, UINT64 flags, UINTN* response_length, ConnectionContext* ctx) {
+static EFI_STATUS send_result_message(CoreContext* context, UINT64 flags, BOOLEAN is_last_message, ConnectionContext* ctx) {
     UINT64* payload_u64 = (UINT64*)payload_buffer;
     payload_u64[0] = context->ret_rdtsc_value;
     payload_u64[1] = context->ret_gpf_value;
@@ -149,12 +150,17 @@ static EFI_STATUS construct_result_message(CoreContext* context, UINT64 flags, U
     CopyMem(payload_buffer + fixed_payload_len, context->result_buffer, context->result_buffer_len);
     const UINTN response_size = fixed_payload_len + context->result_buffer_len;
 
-    EFI_STATUS status = construct_message(response_buffer, sizeof(response_buffer), MSG_UCODEEXECUTETESTRESPONSE, payload_buffer, response_size, TRUE);
+    EFI_STATUS status = construct_message(response_buffer, sizeof(response_buffer), MSG_UCODEEXECUTETESTRESPONSE, payload_buffer, response_size, is_last_message);
     if (EFI_ERROR(status)) {
         FormatPrint(L"Unable to construct message: %r.\n", status);
         return status;
     }
-    *response_length = response_size;
+
+    status = send_message(response_buffer, response_size + HEADER_SIZE, ctx);
+    if (EFI_ERROR(status)) {
+        FormatPrint(L"Unable to send message: %r.\n", status);
+        return status;
+    }
 
     return EFI_SUCCESS;
 }
@@ -191,15 +197,11 @@ EFI_STATUS handle_apply_ucode_execute_test(UINT8* payload, UINTN payload_length,
     // core is locked by us, write the job infos
     CoreContext* context = &core_contexts[job_parameters->core_id];
     write_job_infos(job_parameters, context);
-    FormatPrint(L"Wrote job infos.\n");
-
 
     context->job_queued = 1;
-    FormatPrint(L"Job queued.\n");
 
     UINT64 flags = 0ull;
     if (job_parameters->core_id == 0) {
-        FormatPrint(L"Sync exec on core 0.\n");
         // synchronous execution on boot core
         // context is still locked here
         context->ready = 0;
@@ -212,7 +214,6 @@ EFI_STATUS handle_apply_ucode_execute_test(UINT8* payload, UINTN payload_length,
 
         // core 0 is done with synchronous execution
         unlock_context(context);
-        FormatPrint(L"Unlocked context.\n");
     } else {
         // an AP will now grab the job
         unlock_context(context);
@@ -224,7 +225,21 @@ EFI_STATUS handle_apply_ucode_execute_test(UINT8* payload, UINTN payload_length,
         UINT64 timeout = job_parameters->timeout;
         // has the job completed?
         // not completely race condition safe, but should be good enough
-        while (context->lock == 0 && context->ready != 1 && context->job_queued != 0) {
+        while (1) {
+            if (context->lock == 0) {
+                // potentially unlocked, try to get a lock
+                if (try_lock_context(context)) {
+                    if (context->ready == 1 && context->job_queued == 0) {
+                        // job finished
+                        unlock_context(context);
+                        break;
+                    }
+                    unlock_context(context);
+                }
+                // AP just grabbed the lock, check again next iteration
+            }
+
+            // timeout handling
             if (timeout != 0) {
                 gBS->Stall(1000); // stall 1ms
                 if (++iterations >= timeout) {
@@ -238,23 +253,46 @@ EFI_STATUS handle_apply_ucode_execute_test(UINT8* payload, UINTN payload_length,
         }
     }
 
-    FormatPrint(L"Writing response.\n");
-    UINTN response_size = 0;
-    status = construct_result_message(context, flags, &response_size, ctx);
+    status = send_result_message(context, flags, TRUE, ctx);
     if (EFI_ERROR(status)) {
-        return status;
-    }
-
-    FormatPrint(L"Sending response of size %llu.\n", response_size);
-    status = send_message(response_buffer, response_size + HEADER_SIZE, ctx);
-    if (EFI_ERROR(status)) {
-        FormatPrint(L"Unable to send message: %r.\n", status);
         return status;
     }
 
     return EFI_SUCCESS;
 }
 
+EFI_STATUS handle_get_last_test_result(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
+    PrintDebug(L"Handling MSG_GETLASTTESTRESULT message.\n");
+    EFI_STATUS status = EFI_SUCCESS;
+    if (payload_length < 8) {
+        FormatPrint(L"MSG_GETLASTTESTRESULT is too short, need at least 8 Bytes, got %u.\n", payload_length);
+        send_status(0x1, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    UINT64 core_id = *(UINT64*)payload;
+
+    if (core_id > MAX_CORE_COUNT) {
+        FormatPrint(L"Core id %u is out of range, only %u max cores are supported.\n", core_id, MAX_CORE_COUNT);
+        send_status(0x2, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    CoreContext* context = &core_contexts[core_id];
+
+    status = send_core_status(context, FALSE, ctx);
+    if (EFI_ERROR(status)) {
+        return status;
+    }
+
+    // flags are defined as 0 for MSG_GETLASTTESTRESULT
+    status = send_result_message(context, 0ull, TRUE, ctx);
+    if (EFI_ERROR(status)) {
+        return status;
+    }
+
+    return EFI_SUCCESS;
+}
 
 EFI_STATUS handle_send_machine_code(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     PrintDebug(L"Handling SENDMACHINECODE message.\n");
@@ -283,7 +321,7 @@ EFI_STATUS handle_send_machine_code(UINT8* payload, UINTN payload_length, Connec
     }
     machine_codes[target_slot].length = machine_code_size;
     CopyMem(machine_codes[target_slot].machine_code, payload + 8, machine_code_size);
-    
+
     send_status(0x0, NULL, ctx);
 
     return EFI_SUCCESS;

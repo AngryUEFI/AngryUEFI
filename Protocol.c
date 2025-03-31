@@ -11,6 +11,7 @@
 #include "handlers/debug.h"
 #include "handlers/ucode.h"
 #include "handlers/ucode_execute.h"
+#include "handlers/cores.h"
 
 UINT8 payload_buffer[RESPONSE_PAYLOAD_SIZE];
 UINT8 response_buffer[RESPONSE_BUFFER_SIZE];
@@ -56,8 +57,8 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
         case MSG_APPLYUCODEEXCUTETEST:
             handle_apply_ucode_execute_test(message + payload_offset, message_length - payload_offset, ctx);
             break;
-        case MSG_SENDMACHINECODE:
-            handle_send_machine_code(message + payload_offset, message_length - payload_offset, ctx);
+        case MSG_GETLASTTESTRESULT:
+            handle_get_last_test_result(message + payload_offset, message_length - payload_offset, ctx);
             break;
         case MSG_READMSR:
             handle_read_msr(message + payload_offset, message_length - payload_offset, ctx);
@@ -65,6 +66,16 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
         case MSG_GETCORECOUNT:
             handle_get_core_count(message + payload_offset, message_length - payload_offset, ctx);
             break;
+        case MSG_STARTCORE:
+            handle_start_core(message + payload_offset, message_length - payload_offset, ctx);
+            break;
+        case MSG_GETCORESTATUS:
+            handle_get_core_status(message + payload_offset, message_length - payload_offset, ctx);
+            break;
+        case MSG_SENDMACHINECODE:
+            handle_send_machine_code(message + payload_offset, message_length - payload_offset, ctx);
+            break;
+        
         default:
             FormatPrintDebug(L"Unknown message type 0x%08X\n", message_type);
             send_message(FormatBuffer, 0x80000001, ctx);
@@ -93,9 +104,9 @@ EFI_STATUS construct_message(UINT8* message_buffer, UINTN buffer_capacity, UINT3
 EFI_STATUS send_status(UINT32 status_code, CHAR16* message, ConnectionContext* ctx) {
     UINTN response_size = 8;
     if (message != NULL) {
-        response_size += StrLen(message);
-        CopyMem(payload_buffer + 4, message, StrLen(message));
-        ((UINT32*)payload_buffer)[1] = StrLen(message) * 2;
+        response_size += StrSize(message);
+        CopyMem(payload_buffer + 8, message, StrSize(message));
+        ((UINT32*)payload_buffer)[1] = StrSize(message);
     } else {
         ((UINT32*)payload_buffer)[1] = 0;
     }
