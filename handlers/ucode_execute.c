@@ -220,11 +220,10 @@ EFI_STATUS handle_apply_ucode_execute_test(UINT8* payload, UINTN payload_length,
 
         // wait for requested timeout
         // or until job completes
-        // timeout == 0 means wait for ever (not recommended)
+        // timeout == 0 means wait forever (not recommended)
         UINTN iterations = 0;
         UINT64 timeout = job_parameters->timeout;
         // has the job completed?
-        // not completely race condition safe, but should be good enough
         while (1) {
             if (context->lock == 0) {
                 // potentially unlocked, try to get a lock

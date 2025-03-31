@@ -264,7 +264,7 @@ static void InstallCustomGpfHandler() {
     FormatPrint(L"apply_ucode_simple is at %p.\n", apply_ucode_simple);
 
     // Finally, write back the updated IDT.
-    // write_idt_position(IdtInfo);
+    write_idt_position();
 }
 
 void log_panic() {

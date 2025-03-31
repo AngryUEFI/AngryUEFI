@@ -95,6 +95,7 @@ read_msr_stub:
     # update address, high part
     shr $32, %rdx
     wrmsr
+    # GPF hit? -> 0xdead in %rax
     mov %rax, %r9
 
     rdtscp

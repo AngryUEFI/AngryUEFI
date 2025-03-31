@@ -71,6 +71,13 @@ static EFIAPI void core_main_loop(void* arg) {
     CoreContext* context = (CoreContext*)arg;
     // we enter this function with a locked context
 
+    // set the IDTR to the one from core 0
+    // potential issue:
+    // this assumes ucode was already inited, which inits
+    // the custom GPF
+    // if this did not occur, this will fail
+    write_idt_position();
+
     // ready for work :)
     context->started = 1;
     context->ready = 1;

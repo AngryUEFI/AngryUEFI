@@ -17,7 +17,9 @@ UINT64 get_tsc();
 // currently only a dummy implementation which ASSERT()s is provided
 UINT64 interlocked_compare_exchange_64(volatile UINT64* mem, UINT64 compare_value, UINT64 exchange_value);
 
+// stores IDTR to the memory location, returns the address
 UINT8* read_idt_position();
+// reads IDTR from the memory location
 void write_idt_position();
 
 void gpf_handler();
