@@ -1,0 +1,8 @@
+name: Build AngryUEFI
+description: Build AngryUEFI
+
+runs:
+  using: docker
+  image: docker://ghcr.io/tianocore/containers/ubuntu-22-test
+  args:
+    - ${{vars.ANGRYEDK_DOCKER_BASE_PATH}}/build-docker.sh
