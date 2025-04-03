@@ -9,8 +9,11 @@ UINT64 test_stub(UINT64 a, UINT64 b);
 UINT64 read_msr_stub(UINT32 target_msr);
 UINT64 apply_ucode_simple(UINT8* ucode, UINT64* interrupt_value);
 UINT64 apply_ucode_restore(UINT8* ucode, UINT64* interrupt_value);
-SMP_SAFE void apply_ucode_execute_machine_code_simple(CoreContext* meta_data, void*);
-SMP_SAFE void apply_ucode_execute_machine_code_restore(CoreContext* meta_data, void*);
+
+SMP_SAFE void apply_ucode_execute_machine_code_simple(CoreContext* context, void*);
+SMP_SAFE void apply_ucode_execute_machine_code_restore(CoreContext* context, void*);
+SMP_SAFE void execute_machine_code(CoreContext* context, void*);
+
 // return rdtsc
 SMP_SAFE UINT64 get_tsc();
 // need to implement this ourselves, else need to modify build config

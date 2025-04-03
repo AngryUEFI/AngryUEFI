@@ -174,6 +174,19 @@ l_apply_ucode_execute_machine_code_restore_ret:
     m_restore_regs
     ret
 
+    .global execute_machine_code
+    .type execute_machine_code, @function
+execute_machine_code:
+    m_save_regs
+    # write context pointer into RAX as defined by ABI
+    mov %rdi, %rax
+    # get machine code address to call
+    movq 32(%rdi), %rdi
+    call *%rdi
+
+    m_restore_regs
+    ret
+
     .global get_tsc
     .type get_tsc, @function
 get_tsc:

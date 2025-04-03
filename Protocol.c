@@ -60,6 +60,9 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
         case MSG_GETLASTTESTRESULT:
             handle_get_last_test_result(message + payload_offset, message_length - payload_offset, ctx);
             break;
+        case MSG_EXECUTEMACHINECODE:
+            handle_execute_machine_code(message + payload_offset, message_length - payload_offset, ctx);
+            break;
         case MSG_READMSR:
             handle_read_msr(message + payload_offset, message_length - payload_offset, ctx);
             break;

@@ -120,6 +120,80 @@ static EFI_STATUS send_result_message(CoreContext* context, UINT64 flags, BOOLEA
     return EFI_SUCCESS;
 }
 
+EFI_STATUS handle_execute_machine_code(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
+    PrintDebug(L"Handling MSG_EXECUTEMACHINECODE message.\n");
+    EFI_STATUS status = EFI_SUCCESS;
+    if (payload_length < 12) {
+        FormatPrint(L"MSG_EXECUTEMACHINECODE is too short, need at least 12 Bytes, got %u.\n", payload_length);
+        send_status(0x1, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    UINT32* payload_u32 = (UINT32*)payload;
+
+    UINT32 target_machine_code_slot = payload_u32[0];
+    UINT32 target_core_id = payload_u32[1];
+    UINT32 timeout = payload_u32[2];
+
+    if (target_machine_code_slot >= MACHINE_CODE_SLOTS) {
+        FormatPrint(L"Target machine code slot %u is unsupported, only have %u slots.\n", target_machine_code_slot, MACHINE_CODE_SLOTS);
+        send_status(0x2, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    if (machine_codes[target_machine_code_slot].machine_code == NULL || machine_codes[target_machine_code_slot].length == 0) {
+        FormatPrint(L"Target machine code slot %u is empty.\n", target_machine_code_slot);
+        send_status(0x3, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    status = acquire_core_lock_for_job(target_core_id, ctx);
+    if (status != EFI_SUCCESS) {
+        return status;
+    }
+
+    CoreContext* context = &core_contexts[target_core_id];
+    clear_core_functions(context);
+
+    context->ret_gpf_value = 0;
+    context->ret_rdtsc_value = 0;
+    context->core_functions[0].func = execute_machine_code;
+    context->core_functions[0].arg = NULL;
+    context->current_machine_code_slot_address = machine_codes[target_machine_code_slot].machine_code;
+    ZeroMem(context->result_buffer, context->result_buffer_len);
+
+    context->job_queued = 1;
+
+    UINT64 flags = 0ull;
+    if (target_core_id == 0) {
+        // synchronous execution on boot core
+        // context is still locked here
+        context->ready = 0;
+        context->job_queued = 0;
+
+        call_core_functions(context);
+
+        context->ready = 1;
+
+        // core 0 is done with synchronous execution
+        unlock_context(context);
+    } else {
+        // an AP will now grab the job
+        unlock_context(context);
+
+        // wait for requested timeout
+        // or until job completes
+        // timeout == 0 means wait forever (not recommended)
+        BOOLEAN timeout_reached = wait_on_ap_exec(context, (UINT64)timeout);
+        if (timeout_reached) {
+            // set LSB to indicate timeout was reached
+            flags |= 0x1;
+        }
+    }
+
+    return send_result_message(context, flags, TRUE, ctx);
+}
+
 EFI_STATUS handle_apply_ucode_execute_test(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     PrintDebug(L"Handling MSG_APPLYUCODEEXCUTETEST message.\n");
     EFI_STATUS status = EFI_SUCCESS;
