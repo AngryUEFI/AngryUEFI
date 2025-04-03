@@ -63,6 +63,9 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
         case MSG_READMSR:
             handle_read_msr(message + payload_offset, message_length - payload_offset, ctx);
             break;
+        case MSG_READMSRONCORE:
+            handle_read_msr_on_core(message + payload_offset, message_length - payload_offset, ctx);
+            break;
         case MSG_GETCORECOUNT:
             handle_get_core_count(message + payload_offset, message_length - payload_offset, ctx);
             break;

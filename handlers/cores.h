@@ -2,6 +2,7 @@
 #define CORES_H
 
 #include <Base.h>
+#include <Library/BaseMemoryLib.h>
 
 #include "AngryUEFI.h"
 
@@ -9,14 +10,34 @@ void init_cores();
 
 #define RESULT_BUFFER_SIZE 1*1024
 #define MACHINE_CODE_SCRATCH_SPACE_SIZE 4*1024
+#define CORE_FUNCTION_SLOTS 3
 
 typedef struct CoreContext_s CoreContext;
+
+// no-op annotation to signal a function is safe to call from an AP
+// no properties are actually enforced, don't shoot your foot off
+// the function guarantees:
+// 1. does not use global/static state
+// 2. does not call functions not SMP_SAFE
+// 3. can run in parallel on APs
+// 4. will never acquire locks
+// the function expects:
+// 1. all passed arguments, pointers and otherwise, are safe to modify on APs
+// 2. passed pointers, e.g. CoreContext, are locked if needed
+// 3. passed function pointers are SMP_SAFE
+#define SMP_SAFE
 
 EFI_STATUS handle_start_core(UINT8* payload, UINTN payload_length, ConnectionContext* ctx);
 EFI_STATUS handle_get_core_status(UINT8* payload, UINTN payload_length, ConnectionContext* ctx);
 EFI_STATUS handle_get_core_count(UINT8* payload, UINTN payload_length, ConnectionContext* ctx);
 
 EFI_STATUS send_core_status(CoreContext* context, BOOLEAN is_last_message, ConnectionContext* ctx);
+
+SMP_SAFE void call_core_functions(CoreContext* context);
+BOOLEAN wait_on_ap_exec(CoreContext* context, UINT64 timeout);
+EFI_STATUS acquire_core_lock_for_job(UINT64 core_id, ConnectionContext* ctx);
+
+SMP_SAFE void clear_core_functions(CoreContext* context);
 
 // lock the context
 // will spin until lock is available
@@ -26,8 +47,12 @@ void unlock_context(CoreContext* context);
 // try to get a lock, fail if context is already locked
 BOOLEAN try_lock_context(CoreContext* context);
 
-typedef VOID (*JobFunction)(CoreContext* argument);
-typedef VOID (*PrepareFunction)(CoreContext* argument);
+typedef SMP_SAFE void (*CoreFunction)(CoreContext* argument, void* arg);
+
+typedef struct CoreFunctionCall_s {
+    CoreFunction func;
+    void* arg;
+} CoreFunctionCall;
 
 // each core gets its own copy of this control structure
 // jobs operate on this structure
@@ -43,6 +68,7 @@ typedef struct CoreContext_s {
     // they are accessed from asm stubs via offsets
     // they might also be accessed from AngryCAT provided
     // machine code, which is not visible in stubs.s
+
     // zeroed before job execution
     void* result_buffer; // + 0
     UINT64 result_buffer_len; // + 8
@@ -65,20 +91,11 @@ typedef struct CoreContext_s {
     // might change depending on C code changes
     // if you need access to them from asm, move them
     // higher, but below existing asm fields
-    
-    // the actual job function to execute
-    // assume this is running on an AP
-    // this means no UEFI functions may be called
-    // called via function that updates the flags below
-    JobFunction job_function;
-    void* job_function_argument;
 
-    // if not NULL, called before the actual job function
-    // use case is to perform additional processing
-    // before going into asm stubs
-    // mostly used to fill core cache with ucode update
-    PrepareFunction prepare_function;
-    void* prepare_function_argument;
+    // if any function pointer is != NULL it is
+    // called on the AP in its main loop
+    // do not call UEFI functions
+    CoreFunctionCall core_functions[CORE_FUNCTION_SLOTS];
 
     // updated by core loop with current rdtsc value
     // may only be written from the spinning core
@@ -97,6 +114,7 @@ typedef struct CoreContext_s {
     // even though these are 1 bit flags, they are
     // stored as 8 byte integers for easier atomic read/writes
     // wasteful, but simple
+
     // core is actually present on this CPU
     UINT64 present;
     // core was started and is in its main loop

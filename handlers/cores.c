@@ -7,6 +7,7 @@
 #include <Protocol/SimpleTextOut.h>
 #include <Uefi.h>
 #include <Library/MemoryAllocationLib.h>
+#include <Library/UefiBootServicesTableLib.h>
 
 #include "smp.h"
 #include "stubs.h"
@@ -48,11 +49,7 @@ static void handle_job(CoreContext* context) {
     context->ready = 0;
     context->job_queued = 0;
 
-    PrepareFunction prepare = context->prepare_function;
-    prepare(context->prepare_function_argument);
-
-    JobFunction to_call = context->job_function;
-    to_call(context->job_function_argument);
+    call_core_functions(context);
 
     // job function filled the context
     // indicate we are ready for the next job
@@ -105,6 +102,90 @@ static EFIAPI void core_main_loop(void* arg) {
             continue;
         }
     }
+}
+
+SMP_SAFE void call_core_functions(CoreContext* context) {
+    for (UINTN i = 0; i < CORE_FUNCTION_SLOTS; i++) {
+        CoreFunction func = context->core_functions[i].func;
+        if (func != NULL) {
+            func(context, context->core_functions[i].arg);
+        }
+    }
+}
+
+BOOLEAN wait_on_ap_exec(CoreContext* context, UINT64 timeout) {
+    UINTN iterations = 0;
+    while (1) {
+        if (context->lock == 0) {
+            // potentially unlocked, try to get a lock
+            if (try_lock_context(context)) {
+                if (context->ready == 1 && context->job_queued == 0) {
+                    // job finished
+                    unlock_context(context);
+                    return FALSE;
+                }
+                unlock_context(context);
+            }
+            // AP just grabbed the lock, check again next iteration
+        }
+
+        // timeout handling
+        if (timeout != 0) {
+            gBS->Stall(1000); // stall 1ms
+            if (++iterations >= timeout) {
+                return TRUE;
+            }
+        } else {
+            CpuPause();
+        }
+    }
+}
+
+EFI_STATUS acquire_core_lock_for_job(UINT64 core_id, ConnectionContext* ctx) {
+    if (core_id >= MAX_CORE_COUNT) {
+        FormatPrint(L"Core id %u is out of range, only max cores are supported.\n", core_id, MAX_CORE_COUNT);
+        send_status(0x201, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    CoreContext* context = &core_contexts[core_id];
+    if (context->present != 1) {
+        FormatPrint(L"Core id %u is not present on this CPU.\n", core_id);
+        send_status(0x202, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    if (context->started != 1) {
+        FormatPrint(L"Core id %u is not started.\n", core_id);
+        send_status(0x203, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    if (!try_lock_context(context)) {
+        FormatPrint(L"Core id %u context is already locked, invalid state.\n", core_id);
+        send_status(0x204, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    if (context->ready != 1) {
+        unlock_context(context);
+        FormatPrint(L"Core id %u is not ready to accept a job.\n", core_id);
+        send_status(0x205, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    if (context->job_queued == 1) {
+        unlock_context(context);
+        FormatPrint(L"Core id %u already has a job queued.\n", core_id);
+        send_status(0x206, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    return EFI_SUCCESS;
+}
+
+SMP_SAFE inline void clear_core_functions(CoreContext* context) {
+    ZeroMem(context->core_functions, sizeof(context->core_functions));
 }
 
 EFI_STATUS handle_start_core(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {

@@ -162,6 +162,33 @@ EFI_STATUS handle_apply_ucode(UINT8* payload, UINTN payload_length, ConnectionCo
     return EFI_SUCCESS;
 }
 
+SMP_SAFE static void read_msr(CoreContext*, void* arg) {
+    UINT32* buf_u32 = (UINT32*)arg;
+    UINT32 target_msr = buf_u32[0];
+    UINT64 ret = read_msr_stub(target_msr);
+    buf_u32[0] = ret & 0xFFFFFFFF;
+    buf_u32[1] = ret >> 32;
+}
+
+static EFI_STATUS send_msr_response(UINT32 values[2], ConnectionContext* ctx) {
+    FormatPrintDebug(L"EAX: 0x%08X, EDX: 0x%08X.\n", buf_u32[0], buf_u32[1]); 
+
+    const UINTN payload_size = 2 * sizeof(UINT32);
+    EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_MSRRESPONSE, (UINT8*)values, payload_size, TRUE);
+    if (EFI_ERROR(Status)) {
+        FormatPrint(L"Unable to construct message: %r.\n", Status);
+        return Status;
+    }
+
+    Status = send_message(response_buffer, payload_size + HEADER_SIZE, ctx);
+    if (EFI_ERROR(Status)) {
+        FormatPrint(L"Unable to send message: %r.\n", Status);
+        return Status;
+    }
+
+    return EFI_SUCCESS;
+}
+
 EFI_STATUS handle_read_msr(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     PrintDebug(L"Handling MSG_READMSR message.\n");
     if (payload_length < 4) {
@@ -170,27 +197,54 @@ EFI_STATUS handle_read_msr(UINT8* payload, UINTN payload_length, ConnectionConte
         return EFI_INVALID_PARAMETER;
     }
 
+    UINT32 buf_u32[2] = {0};
     UINT32 target_msr = *(UINT32*)payload;
+    buf_u32[0] = target_msr;
 
-    UINT32 outputs[2] = {0};
-    UINT64 ret = read_msr_stub(target_msr);
-    outputs[0] = ret & 0xFFFFFFFF;
-    outputs[1] = ret >> 32;
-    FormatPrintDebug(L"EAX: 0x%08X, EDX: 0x%08X.\n", outputs[0], outputs[1]); 
+    read_msr(NULL, buf_u32);
 
-    EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_MSRRESPONSE, (UINT8*)outputs, sizeof(outputs), TRUE);
-    if (EFI_ERROR(Status)) {
-        FormatPrint(L"Unable to construct message: %r.\n", Status);
-        return Status;
+    return send_msr_response(buf_u32, ctx);
+}
+
+EFI_STATUS handle_read_msr_on_core(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
+    EFI_STATUS status = EFI_SUCCESS;
+    PrintDebug(L"Handling MSG_READMSRONCORE message.\n");
+    if (payload_length < 12) {
+        FormatPrint(L"MSG_READMSRONCORE is too short, need at least 12 Bytes, got %u.\n", payload_length);
+        send_status(0x1, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
     }
 
-    Status = send_message(response_buffer, sizeof(outputs) + HEADER_SIZE, ctx);
-    if (EFI_ERROR(Status)) {
-        FormatPrint(L"Unable to send message: %r.\n", Status);
-        return Status;
+    UINT32 target_msr = *(UINT32*)payload;
+    UINT64 core_id = *(UINT64*)(payload + 4);
+
+    if (core_id == 0) {
+        return handle_read_msr(payload, payload_length, ctx);
     }
 
-    return EFI_SUCCESS;
+    UINT32 buf_u32[2] = {0};
+    buf_u32[0] = target_msr;
+
+    status = acquire_core_lock_for_job(core_id, ctx);
+    if (status != EFI_SUCCESS) {
+        return status;
+    }
+    CoreContext* context = &core_contexts[core_id];
+
+    clear_core_functions(context);
+    context->core_functions[0].func = read_msr;
+    context->core_functions[0].arg = buf_u32;
+    context->job_queued = 1;
+
+    // execution starts
+    unlock_context(context);
+    if (wait_on_ap_exec(context, 100)) {
+        FormatPrint(L"Core %u was ready, but did not respond to read msr in 100ms, likely stuck?\n", core_id);
+        send_status(0x2, FormatBuffer, ctx);
+        return EFI_TIMEOUT;
+    }
+
+    return send_msr_response(buf_u32, ctx);
 }
 
 // IDT entry for x64
