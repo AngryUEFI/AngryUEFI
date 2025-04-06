@@ -55,7 +55,6 @@ typedef struct CoreFunctionCall_s {
 } CoreFunctionCall;
 
 typedef struct CoreFaultInfo_s CoreFaultInfo;
-typedef struct IDT_DESCRIPTOR_s IDT_DESCRIPTOR;
 
 // each core gets its own copy of this control structure
 // jobs operate on this structure
@@ -119,10 +118,11 @@ typedef struct CoreContext_s {
     UINT8* fault_handlers;
     UINT8* original_fault_handlers_ptr;
 
-    // set on core 0, address of the IDT descriptor
-    // start of AP main loop this will be loaded into
-    // IDTR via LIDT
-    IDT_DESCRIPTOR* core_idt_descriptor;
+    // set on core 0
+    // during start of the AP main loop this will
+    // be loaded into IDTR via LIDT
+    void* idt_base;
+    UINT64 idt_limit;
 
     // flags used to control the core state
     // read and written from core_id and core 0

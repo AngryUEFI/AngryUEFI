@@ -14,6 +14,7 @@
 #include "Protocol.h"
 
 #include "handlers/fault_handling.h"
+#include "handlers/fault_handling_stubs.h"
 
 void lock_context(CoreContext* context) {
     // spin loop until we get the lock
@@ -51,6 +52,11 @@ static void handle_job(CoreContext* context) {
     context->ready = 0;
     context->job_queued = 0;
 
+    // zero out previous fault
+    if (context->fault_info->fault_occured != 0) {
+        ZeroMem(context->fault_info, sizeof(CoreFaultInfo));
+    }
+
     call_core_functions(context);
 
     // job function filled the context
@@ -70,14 +76,8 @@ static EFIAPI void core_main_loop(void* arg) {
     CoreContext* context = (CoreContext*)arg;
     // we enter this function with a locked context
 
-    // set the IDTR to the one from core 0
-    // potential issue:
-    // this assumes ucode was already inited, which inits
-    // the custom GPF
-    // if this did not occur, this will fail
-    write_idt_position();
-
-    // write_idt_on_core(context);
+    // set core specific IDTR
+    write_idt_on_core(context);
 
     // ready for work :)
     context->started = 1;
@@ -313,18 +313,33 @@ EFI_STATUS send_core_status(CoreContext* context, BOOLEAN is_last_message, Conne
     EFI_STATUS status = EFI_SUCCESS;
     UINT64* payload_u64 = (UINT64*)payload_buffer;
 
+    BOOLEAN dump_fault_info = FALSE;
     UINT64 flags = 0ull;
     flags |= (context->present & 0x1) << 0;
     flags |= (context->started & 0x1) << 1;
     flags |= (context->ready & 0x1) << 2;
     flags |= (context->job_queued & 0x1) << 3;
     flags |= (context->lock & 0x1) << 4;
+    // fault info only gets inited once the core starts
+    if (context->fault_info != NULL) {
+        flags |= (context->fault_info->fault_occured & 0x1) << 5;
+        if (context->fault_info->fault_occured != 0) {
+            dump_fault_info = TRUE;
+        }
+    }
     
     payload_u64[0] = flags;
     payload_u64[1] = context->heartbeat;
     payload_u64[2] = get_tsc();
+    payload_u64[3] = 0;
 
-    const UINTN response_size = 3 * sizeof(UINT64);
+    UINTN response_size = 4 * sizeof(UINT64);
+
+    if (dump_fault_info) {
+        payload_u64[3] = sizeof(CoreFaultInfo);
+        response_size += sizeof(CoreFaultInfo);
+        CopyMem(&payload_u64[4], context->fault_info, sizeof(CoreFaultInfo));
+    }
 
     status = construct_message(response_buffer, sizeof(response_buffer), MSG_CORESTATUSRESPONSE, payload_buffer, response_size, is_last_message);
     if (EFI_ERROR(status)) {

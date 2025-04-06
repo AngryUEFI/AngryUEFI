@@ -7,7 +7,11 @@
 
 // access from assembly, do not change order
 // only accessed from assembly in fault_handling_stubs.s
+// AngryCAT python code might read some offsets, check that code after edits here
+// prefer to add new fields at the end, AngryCAT can deal with longer buffers
+// zeroed unless fault occurs
 typedef struct CoreFaultInfo_s {
+    // zeroed when starting a new job
     UINT64 fault_occured; // + 0x0
 
     UINT64 fault_number; // + 0x8

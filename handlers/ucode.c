@@ -290,10 +290,6 @@ static void InstallCustomGpfHandler() {
     IdtEntries[Vector].OffsetHigh       = (UINT32)((HandlerAddr >> 32) & 0xFFFFFFFF);
     IdtEntries[Vector].Reserved         = 0;
 
-    // Optionally, verify your changes by reading back the entry.
-    FormatPrint(L"Custom GPF handler installed at vector 13, handler address = 0x%lx\n", HandlerAddr);
-    FormatPrint(L"apply_ucode_simple is at %p.\n", apply_ucode_simple);
-
     // Finally, write back the updated IDT.
     write_idt_position();
 }
