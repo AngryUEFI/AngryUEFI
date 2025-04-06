@@ -30,6 +30,8 @@
   handlers/ucode.c
   handlers/ucode_execute.c
   handlers/cores.c
+  handlers/fault_handling_stubs.s
+  handlers/fault_handling.c
 
 [Packages]
   MdePkg/MdePkg.dec

@@ -54,6 +54,9 @@ typedef struct CoreFunctionCall_s {
     void* arg;
 } CoreFunctionCall;
 
+typedef struct CoreFaultInfo_s CoreFaultInfo;
+typedef struct IDT_DESCRIPTOR_s IDT_DESCRIPTOR;
+
 // each core gets its own copy of this control structure
 // jobs operate on this structure
 // each core can only run a single job at a time
@@ -80,6 +83,7 @@ typedef struct CoreContext_s {
     UINT64 core_id; // + 48
     UINT64 ret_gpf_value; // + 56
     UINT64 ret_rdtsc_value; // + 64
+    CoreFaultInfo* fault_info; // + 72
 
     // add new fields for asm stubs above this line,
     // but not in the middle of existing fields
@@ -108,6 +112,17 @@ typedef struct CoreContext_s {
 
     // misc fields
     UINT64 current_microcode_len;
+    // if we have to move the pointer due to alignment
+    // we should keep the original one around
+    CoreFaultInfo* original_fault_info_ptr;
+    // also needs to be aligned
+    UINT8* fault_handlers;
+    UINT8* original_fault_handlers_ptr;
+
+    // set on core 0, address of the IDT descriptor
+    // start of AP main loop this will be loaded into
+    // IDTR via LIDT
+    IDT_DESCRIPTOR* core_idt_descriptor;
 
     // flags used to control the core state
     // read and written from core_id and core 0

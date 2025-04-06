@@ -13,6 +13,8 @@
 #include "stubs.h"
 #include "Protocol.h"
 
+#include "handlers/fault_handling.h"
+
 void lock_context(CoreContext* context) {
     // spin loop until we get the lock
     while (interlocked_compare_exchange_64(&context->lock, 0, 1) != 0) {
@@ -74,6 +76,8 @@ static EFIAPI void core_main_loop(void* arg) {
     // the custom GPF
     // if this did not occur, this will fail
     write_idt_position();
+
+    // write_idt_on_core(context);
 
     // ready for work :)
     context->started = 1;
@@ -188,6 +192,41 @@ SMP_SAFE inline void clear_core_functions(CoreContext* context) {
     ZeroMem(context->core_functions, sizeof(context->core_functions));
 }
 
+static EFI_STATUS start_core(UINT64 core_id, EFI_AP_PROCEDURE core_main, ConnectionContext* ctx) {
+    EFI_STATUS status = EFI_SUCCESS;
+    
+    CoreContext* context = &core_contexts[core_id];
+    if (context->present != 1) {
+        FormatPrint(L"Core id %u is not present on this CPU.\n", core_id);
+        send_status(0x3, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    if (context->started == 1) {
+        FormatPrint(L"Core id %u is already started.\n", core_id);
+        send_status(0x4, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    if (!try_lock_context(context)) {
+        FormatPrint(L"Core id %u already has a locked context.\n", core_id);
+        send_status(0x5, FormatBuffer, ctx);
+        return EFI_INVALID_PARAMETER;
+    }
+
+    init_fault_handlers_on_core(context);
+
+    status = start_on_core(core_id, core_main, context, &context->core_event, 0);
+    if (status != EFI_SUCCESS) {
+        unlock_context(context);
+        FormatPrint(L"Core id %u can not be started: %r.\n", core_id, status);
+        send_status(0x6, FormatBuffer, ctx);
+        return status;
+    }
+    
+    return EFI_SUCCESS;
+}
+
 EFI_STATUS handle_start_core(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     PrintDebug(L"Handling MSG_STARTCORE message.\n");
     EFI_STATUS status = EFI_SUCCESS;
@@ -207,56 +246,19 @@ EFI_STATUS handle_start_core(UINT8* payload, UINTN payload_length, ConnectionCon
 
     if (core_to_start == 0) {
         for (UINTN i = 1; i < get_available_cores(); i++) {
-            // how did we even get here?
-            if (core_contexts[i].present != 1) {
-                FormatPrint(L"Starting all cores failed: core id %u is not present on this CPU.\n", i);
-                send_status(0x3, FormatBuffer, ctx);
-                return EFI_INVALID_PARAMETER;
-            }
-    
             // no need to start again
             if (core_contexts[i].started == 1) {
                 continue;
             }
             
-            CoreContext* context = &core_contexts[i];
-            if (!try_lock_context(context)) {
-                FormatPrint(L"Starting all cores failed: core id %u already has a locked context.\n", i);
-                send_status(0x5, FormatBuffer, ctx);
-                return EFI_INVALID_PARAMETER;
-            }
-            status = start_on_core(i, core_main_loop, context, &context->core_event, 0);
+            status = start_core(i, core_main_loop, ctx);
             if (status != EFI_SUCCESS) {
-                unlock_context(context);
-                FormatPrint(L"Starting all cores failed: core id %u can not be started: %r.\n", i, status);
-                send_status(0x6, FormatBuffer, ctx);
                 return status;
             }
         }
     } else {
-        if (core_contexts[core_to_start].present != 1) {
-            FormatPrint(L"Core id %u is not present on this CPU.\n", core_to_start);
-            send_status(0x3, FormatBuffer, ctx);
-            return EFI_INVALID_PARAMETER;
-        }
-
-        if (core_contexts[core_to_start].started == 1) {
-            FormatPrint(L"Core id %u is already started.\n", core_to_start);
-            send_status(0x4, FormatBuffer, ctx);
-            return EFI_INVALID_PARAMETER;
-        }
-
-        CoreContext* context = &core_contexts[core_to_start];
-        if (!try_lock_context(context)) {
-            FormatPrint(L"Core id %u already has a locked context.\n", core_to_start);
-            send_status(0x5, FormatBuffer, ctx);
-            return EFI_INVALID_PARAMETER;
-        }
-        status = start_on_core(core_to_start, core_main_loop, context, &context->core_event, 0);
+        status = start_core(core_to_start, core_main_loop, ctx);
         if (status != EFI_SUCCESS) {
-            unlock_context(context);
-            FormatPrint(L"Core id %u can not be started: %r.\n", core_to_start, status);
-            send_status(0x6, FormatBuffer, ctx);
             return status;
         }
     }

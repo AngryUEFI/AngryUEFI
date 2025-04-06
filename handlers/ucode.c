@@ -12,7 +12,8 @@
 #include "AngryUEFI.h"
 #include "stubs.h"
 #include "data/ucode-original-0x17-0x71.h"
-#include "ucode_execute.h"
+#include "handlers/ucode_execute.h"
+#include "handlers/fault_handling.h"
 
 #define ORIGINAL_UCODE ucode_original_0x17_0x71
 #define ORIGINAL_UCODE_LEN ucode_original_0x17_0x71_len
@@ -258,14 +259,6 @@ typedef struct {
     UINT32 OffsetHigh;     // Bits 32-63 of handler address.
     UINT32 Reserved;
 } IDT_ENTRY;
-#pragma pack(pop)
-
-// IDT descriptor for x64 (as defined by the CPU)
-#pragma pack(push,1)
-typedef struct {
-    UINT16 Limit;
-    UINT64 Base;
-} IDT_DESCRIPTOR;
 #pragma pack(pop)
 
 // Define your code segment selector (commonly 0x08 in UEFI environments).
