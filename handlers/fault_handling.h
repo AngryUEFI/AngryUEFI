@@ -20,6 +20,7 @@ typedef struct CoreFaultInfo_s {
     UINT64 rdx_value; // + 0x38
     UINT64 rsi_value; // + 0x40
     UINT64 rdi_value; // + 0x48
+    // upon entry to ISR
     UINT64 rsp_value; // + 0x50
     UINT64 rbp_value; // + 0x58
     UINT64 r8_value; // + 0x60
@@ -39,6 +40,7 @@ typedef struct CoreFaultInfo_s {
     UINT64 cr4_value; // + 0xC0
 
     UINT64 cs_value; // + 0xC8
+    // before switch to ISR
     UINT64 original_rsp; // + 0xD0
 } CoreFaultInfo;
 
@@ -52,5 +54,21 @@ typedef struct IDT_DESCRIPTOR_s {
     UINT64 Base;
 } IDT_DESCRIPTOR;
 #pragma pack(pop)
+
+// IDT entry for x64
+#pragma pack(push,1)
+typedef struct {
+    UINT16 OffsetLow;      // Bits 0-15 of handler address.
+    UINT16 SegmentSelector;// Code segment selector.
+    UINT8  Ist;            // Interrupt Stack Table offset.
+    UINT8  Attributes;     // Type and attributes.
+    UINT16 OffsetMid;      // Bits 16-31 of handler address.
+    UINT32 OffsetHigh;     // Bits 32-63 of handler address.
+    UINT32 Reserved;
+} IDT_ENTRY;
+#pragma pack(pop)
+
+// 0x38 seems to be default for this build/environment
+#define CODE_SEGMENT 0x38
 
 #endif /* FAULT_HANDLING_H */

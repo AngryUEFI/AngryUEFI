@@ -26,7 +26,7 @@ store_registers:
     # original rbx
     movq -0x8(%rsp), %rcx
     movq %rcx, 0x28(%rax)
-    # original rsp
+    # original rsp on entry to ISR
     movq -0x18(%rsp), %rcx
     movq %rcx, 0x50(%rax)
 
@@ -46,6 +46,15 @@ store_registers:
     movq %r13, 0x88(%rax)
     movq %r14, 0x90(%rax)
     movq %r15, 0x98(%rax)
+
+    mov %cr0, %rbx
+    movq %rbx, 0xA8(%rax)
+    mov %cr2, %rbx
+    movq %rbx, 0xA8(%rax)
+    mov %cr3, %rbx
+    movq %rbx, 0xA8(%rax)
+    mov %cr4, %rbx
+    movq %rbx, 0xA8(%rax)
     ret
 
 get_core_ctx_ptr:

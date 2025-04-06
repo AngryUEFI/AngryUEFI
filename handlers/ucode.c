@@ -248,22 +248,6 @@ EFI_STATUS handle_read_msr_on_core(UINT8* payload, UINTN payload_length, Connect
     return send_msr_response(buf_u32, ctx);
 }
 
-// IDT entry for x64
-#pragma pack(push,1)
-typedef struct {
-    UINT16 OffsetLow;      // Bits 0-15 of handler address.
-    UINT16 SegmentSelector;// Code segment selector.
-    UINT8  Ist;            // Interrupt Stack Table offset.
-    UINT8  Attributes;     // Type and attributes.
-    UINT16 OffsetMid;      // Bits 16-31 of handler address.
-    UINT32 OffsetHigh;     // Bits 32-63 of handler address.
-    UINT32 Reserved;
-} IDT_ENTRY;
-#pragma pack(pop)
-
-// Define your code segment selector (commonly 0x08 in UEFI environments).
-#define CODE_SEGMENT 0x38
-
 UINT64* get_idt_address() {
     UINT8* idt_structure = read_idt_position();
     UINT8* idt_addr = (idt_structure+2);
