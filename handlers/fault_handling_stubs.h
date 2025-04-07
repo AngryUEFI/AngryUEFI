@@ -19,4 +19,10 @@ SMP_SAFE void set_idtr(void* idt_base, UINT16 idt_length);
 // writes 0x100 as fault number, no matter the fault
 void fallback_handler();
 
+// called from core main loop entry point
+// saves recovery information to core context
+// calls actual main loop
+// not really SMP_SAFE, only call during core startup
+void core_main_loop_stub_wrapper(CoreContext* context);
+
 #endif /* FAULT_HANDLING_STUBS_H */

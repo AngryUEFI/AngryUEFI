@@ -39,6 +39,15 @@ EFI_STATUS acquire_core_lock_for_job(UINT64 core_id, ConnectionContext* ctx);
 
 SMP_SAFE void clear_core_functions(CoreContext* context);
 
+// actual core main loop
+// does not return
+// not really SMP_SAFE, should only be called during
+// core startup or fault recovery
+// core_main_loop_stub_wrapper calls into this
+// during startup
+// called after fault recovery
+void core_main_loop(CoreContext* context);
+
 // lock the context
 // will spin until lock is available
 // yes, this can deadlock your code

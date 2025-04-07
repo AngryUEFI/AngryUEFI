@@ -374,3 +374,13 @@ set_idtr:
     addq $16, %rsp          # deallocate the temporary space
     popq %rbp
     ret
+
+    .extern core_main_loop
+
+    .global core_main_loop_stub_wrapper
+    .type core_main_loop_stub_wrapper, STT_FUNC
+core_main_loop_stub_wrapper:
+    # parameter: RDI - CoreContext* context
+
+    # branch to actual main loop
+    jmp core_main_loop

@@ -68,12 +68,17 @@ end:
     return;
 }
 
+// EFIAPI, beause it is started from EFI APIs
+// calls into stub
+static EFIAPI void core_main_loop_entry_point(void* arg) {
+    CoreContext* context = (CoreContext*)arg;
+    core_main_loop_stub_wrapper(context);
+}
+
 // this is the main loop of a core
 // all APs spin in this
 // core 0 does not have this main loop, it runs the network stack
-// EFIAPI, beause it is started from EFI APIs
-static EFIAPI void core_main_loop(void* arg) {
-    CoreContext* context = (CoreContext*)arg;
+void core_main_loop(CoreContext* context) {
     // we enter this function with a locked context
 
     // set core specific IDTR
@@ -251,13 +256,13 @@ EFI_STATUS handle_start_core(UINT8* payload, UINTN payload_length, ConnectionCon
                 continue;
             }
             
-            status = start_core(i, core_main_loop, ctx);
+            status = start_core(i, core_main_loop_entry_point, ctx);
             if (status != EFI_SUCCESS) {
                 return status;
             }
         }
     } else {
-        status = start_core(core_to_start, core_main_loop, ctx);
+        status = start_core(core_to_start, core_main_loop_entry_point, ctx);
         if (status != EFI_SUCCESS) {
             return status;
         }
