@@ -15,6 +15,7 @@
 #include "smp.h"
 #include "handlers/ucode.h"
 #include "handlers/cores.h"
+#include "handlers/fault_handling.h"
 
 static EFI_STATUS check_job_parameters(JobParameters* job_parameters, ConnectionContext* ctx) {
     if (job_parameters->ucode_slot >= UCODE_SLOTS) {
@@ -188,6 +189,9 @@ EFI_STATUS handle_execute_machine_code(UINT8* payload, UINTN payload_length, Con
         if (timeout_reached) {
             // set LSB to indicate timeout was reached
             flags |= 0x1;
+        }
+        if (context->fault_info != NULL && context->fault_info->fault_occured == 1) {
+            flags |= 0x2;
         }
     }
 

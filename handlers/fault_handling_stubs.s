@@ -82,9 +82,6 @@ dummy_loop:
     # load ptr to core context
     call get_core_ctx_ptr
 
-    # backup location of core context into %rbx
-    mov %rax, %rbx
-
     # get CoreFaultInfo address
     movq 72(%rax), %rax
     call store_registers
@@ -109,6 +106,10 @@ dummy_loop:
     # RIP <- RSP
 .macro m_handler_no_error_code handler_id
     m_handler_inner \handler_id
+
+    call get_core_ctx_ptr
+    # get CoreFaultInfo address
+    movq 72(%rax), %rax
 
     # old RIP
     movq 0(%rsp), %rcx
@@ -144,6 +145,10 @@ dummy_loop:
     # RIP <- RSP
 .macro m_handler_with_error_code handler_id
     m_handler_inner \handler_id
+
+    call get_core_ctx_ptr
+    # get CoreFaultInfo address
+    movq 72(%rax), %rax
 
     # /error code
     movq 0(%rsp), %rcx
@@ -215,6 +220,10 @@ proto_handler_8:
     # even if later other handlers allow resume
     m_handler_inner 8
 
+    call get_core_ctx_ptr
+    # get CoreFaultInfo address
+    movq 72(%rax), %rax
+    
     # /error code
     movq 0(%rsp), %rcx
     movq %rcx, 0x10(%rax)
@@ -263,25 +272,35 @@ proto_handler_13:
 
     m_handler_inner 13
 
+    pushq %rcx
+    pushq %rax
+
+    call get_core_ctx_ptr
+    # get CoreFaultInfo address
+    movq 72(%rax), %rax
+
     # /error code
-    movq 0(%rsp), %rcx
+    movq 0x10(%rsp), %rcx
     movq %rcx, 0x10(%rax)
     
     # old RIP
-    movq 0x8(%rsp), %rcx
+    movq 0x18(%rsp), %rcx
     movq %rcx, 0x18(%rax)
 
     # CS
-    movq 0x10(%rsp), %rcx
+    movq 0x20(%rsp), %rcx
     movq %rcx, 0xC8(%rax)
 
     # RFLAGS
-    movq 0x18(%rsp), %rcx
+    movq 0x28(%rsp), %rcx
     movq %rcx, 0xA0(%rax)
 
     # original RSP
-    movq 0x20(%rsp), %rcx
+    movq 0x30(%rsp), %rcx
     movq %rcx, 0xD0(%rax)
+
+    popq %rax
+    popq %rcx
 
     # remove error code from stack
     popq %rax
@@ -397,7 +416,11 @@ set_idtr:
 core_main_loop_stub_wrapper:
     # parameter: RDI - CoreContext* context
 
+    # store current RSP into context
+    movq %rsp, 80(%rdi)
+
     # branch to actual main loop
+    # RDI = context
     jmp core_main_loop
 
     # returned to from fault handlers
@@ -405,6 +428,9 @@ core_main_loop_stub_wrapper:
 core_main_loop_stub_recovery:
     # parameter: RDI CoreContext* context
 
-    # temp test, endless loop here instead
-    jmp core_main_loop_stub_recovery
+    # retore RSP from context
+    movq 80(%rdi), %rsp
 
+    # branch to actual main loop
+    # RDI = context
+    jmp core_main_loop_stub_recovery

@@ -68,6 +68,21 @@ end:
     return;
 }
 
+// fault recovery mechanism:
+// 1. core start calls core_main_loop_entry_point from UEFI
+// 2. core_main_loop_entry_point calls core_main_loop_stub_wrapper
+// 3. core_main_loop_stub_wrapper sets context->recovery_rsp to current RSP
+// 4. core_main_loop_stub_wrapper jumps to core_main_loop
+//
+// 5. fault during test execution executes core specific fault handler
+// 6. fault handler returns (iretq) to core_main_loop_stub_recovery
+// 7. core_main_loop_stub_recovery restores context->recovery_rsp into RSP
+// 8. core_main_loop_stub_recovery jumps to core_main_loop
+
+// core_main_loop is re-entrant, inits core again after recovery
+// only next job clears fault status, allows core 0 to retrieve fault info
+// RSP needs to be reset to original value, else stack would grow for each recovered fault
+
 // EFIAPI, beause it is started from EFI APIs
 // calls into stub
 static EFIAPI void core_main_loop_entry_point(void* arg) {
@@ -79,6 +94,7 @@ static EFIAPI void core_main_loop_entry_point(void* arg) {
 // all APs spin in this
 // core 0 does not have this main loop, it runs the network stack
 // after recovery fault handler calls into this
+// must be re-entrant as fault handlers will call into this
 void core_main_loop(CoreContext* context) {
     // we enter this function with a locked context
 
@@ -194,7 +210,7 @@ EFI_STATUS acquire_core_lock_for_job(UINT64 core_id, ConnectionContext* ctx) {
     return EFI_SUCCESS;
 }
 
-SMP_SAFE inline void clear_core_functions(CoreContext* context) {
+SMP_SAFE void clear_core_functions(CoreContext* context) {
     ZeroMem(context->core_functions, sizeof(context->core_functions));
 }
 
