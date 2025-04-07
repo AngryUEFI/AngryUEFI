@@ -7,7 +7,10 @@ proto_fault_stub_start:
 # replaced during init with ptr to core context
 proto_fault_stub_context_ptr:
     .quad 0x0
-    .quad 0x0 # pad
+    # absolute address of recovery function
+    # addressed RIP relative, copied to core specific memory
+recovery_address:
+    .quad core_main_loop_stub_recovery
 
 # expects stack layout as:
 # old_rsp
@@ -61,7 +64,11 @@ get_core_ctx_ptr:
     movq proto_fault_stub_context_ptr(%rip), %rax
     ret
 
-    # fault handlers "retrun" here
+get_return_ptr:
+    movq recovery_address(%rip), %rax
+    ret
+
+    # fault handlers "return" here for endless loop
 dummy_loop:
     jmp dummy_loop
 
@@ -119,7 +126,11 @@ dummy_loop:
     movq 0x18(%rsp), %rcx
     movq %rcx, 0xD0(%rax)
 
-    lea dummy_loop(%rip), %rax
+    # recovery expects CoreContext in RDI
+    call get_core_ctx_ptr
+    mov %rax, %rdi
+    # load absolute address of recovery function
+    call get_return_ptr
     movq %rax, (%rsp)
     iretq
 
@@ -155,7 +166,11 @@ dummy_loop:
     movq %rcx, 0xD0(%rax)
 
     popq %rax
-    lea dummy_loop(%rip), %rax
+    # recovery expects CoreContext in RDI
+    call get_core_ctx_ptr
+    mov %rax, %rdi
+    # load absolute address of recovery function
+    call get_return_ptr
     movq %rax, (%rsp)
     iretq
 
@@ -384,3 +399,12 @@ core_main_loop_stub_wrapper:
 
     # branch to actual main loop
     jmp core_main_loop
+
+    # returned to from fault handlers
+    # fault handlers *must* set the context
+core_main_loop_stub_recovery:
+    # parameter: RDI CoreContext* context
+
+    # temp test, endless loop here instead
+    jmp core_main_loop_stub_recovery
+

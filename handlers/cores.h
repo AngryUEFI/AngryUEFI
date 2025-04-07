@@ -92,6 +92,9 @@ typedef struct CoreContext_s {
     UINT64 ret_gpf_value; // + 56
     UINT64 ret_rdtsc_value; // + 64
     CoreFaultInfo* fault_info; // + 72
+    // during init the RSP is stored here
+    // after recovery RSP is restored to this value
+    UINT64 recovery_rsp; // + 80
 
     // add new fields for asm stubs above this line,
     // but not in the middle of existing fields

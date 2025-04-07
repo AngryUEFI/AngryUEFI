@@ -78,6 +78,7 @@ static EFIAPI void core_main_loop_entry_point(void* arg) {
 // this is the main loop of a core
 // all APs spin in this
 // core 0 does not have this main loop, it runs the network stack
+// after recovery fault handler calls into this
 void core_main_loop(CoreContext* context) {
     // we enter this function with a locked context
 
