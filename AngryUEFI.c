@@ -362,6 +362,10 @@ AngryUEFI(
     }
     Print(L"TCP Configured.\n");
 
+    // The StationAddress holds the IPv4 address.
+    UINT8 *ip = Ip4ModeData.ConfigData.StationAddress.Addr;
+    FormatPrint(L"Interface IP: %d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
+
     // At this point, a connection is accepted. Enter the echo loop.
     for (;;) {
         PrintDebug(L"Looping for new connection.\n");

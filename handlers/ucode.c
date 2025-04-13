@@ -12,11 +12,12 @@
 #include "AngryUEFI.h"
 #include "stubs.h"
 #include "data/ucode-original-0x17-0x71.h"
+#include "data/ucode-original-0x19-0x21.h"
 #include "handlers/ucode_execute.h"
 #include "handlers/fault_handling.h"
 
-#define ORIGINAL_UCODE ucode_original_0x17_0x71
-#define ORIGINAL_UCODE_LEN ucode_original_0x17_0x71_len
+#define ORIGINAL_UCODE ucode_original_0x19_0x21
+#define ORIGINAL_UCODE_LEN ucode_original_0x19_0x21_len
 
 UcodeContainer ucodes[UCODE_SLOTS] = {0};
 MachineCodeContainer machine_codes[MACHINE_CODE_SLOTS] = {0};
@@ -172,7 +173,7 @@ SMP_SAFE static void read_msr(CoreContext*, void* arg) {
 }
 
 static EFI_STATUS send_msr_response(UINT32 values[2], ConnectionContext* ctx) {
-    FormatPrintDebug(L"EAX: 0x%08X, EDX: 0x%08X.\n", buf_u32[0], buf_u32[1]); 
+    FormatPrintDebug(L"EAX: 0x%08X, EDX: 0x%08X.\n", values[0], values[1]); 
 
     const UINTN payload_size = 2 * sizeof(UINT32);
     EFI_STATUS Status = construct_message(response_buffer, sizeof(response_buffer), MSG_MSRRESPONSE, (UINT8*)values, payload_size, TRUE);
