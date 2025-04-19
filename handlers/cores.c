@@ -15,6 +15,8 @@
 
 #include "system/fault_handling.h"
 #include "system/fault_handling_stubs.h"
+#include "system/paging_stubs.h"
+#include "system/paging.h"
 
 void lock_context(CoreContext* context) {
     // spin loop until we get the lock
@@ -87,6 +89,7 @@ end:
 // calls into stub
 static EFIAPI void core_main_loop_entry_point(void* arg) {
     CoreContext* context = (CoreContext*)arg;
+    set_cr3(context->cr3_value);
     core_main_loop_stub_wrapper(context);
 }
 
@@ -100,6 +103,9 @@ void core_main_loop(CoreContext* context) {
 
     // set core specific IDTR
     write_idt_on_core(context);
+
+    // update cr3
+    context->cr3_value = get_cr3();
 
     // ready for work :)
     context->started = 1;
@@ -169,7 +175,7 @@ BOOLEAN wait_on_ap_exec(CoreContext* context, UINT64 timeout) {
 
 EFI_STATUS acquire_core_lock_for_job(UINT64 core_id, ConnectionContext* ctx) {
     if (core_id >= MAX_CORE_COUNT) {
-        FormatPrint(L"Core id %u is out of range, only max cores are supported.\n", core_id, MAX_CORE_COUNT);
+        FormatPrint(L"Core id %u is out of range, only max %u cores are supported.\n", core_id, MAX_CORE_COUNT);
         send_status(0x201, FormatBuffer, ctx);
         return EFI_INVALID_PARAMETER;
     }
@@ -237,6 +243,10 @@ static EFI_STATUS start_core(UINT64 core_id, EFI_AP_PROCEDURE core_main, Connect
     }
 
     init_fault_handlers_on_core(context);
+    // uses core 0 cr3 as base
+    void* new_cr3 = create_minimal_paging(get_cr3());
+    context->cr3_value = new_cr3;
+    // on core start function will load this value
 
     status = start_on_core(core_id, core_main, context, &context->core_event, 0);
     if (status != EFI_SUCCESS) {
@@ -399,6 +409,7 @@ static void init_core_contexts() {
     core_0->present = 1;
     core_0->started = 1;
     core_0->ready = 1;
+    core_0->cr3_value = get_cr3();
 }
 
 void init_cores() {

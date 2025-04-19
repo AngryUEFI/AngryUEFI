@@ -32,6 +32,8 @@
   system/fault_handling_stubs.s
   system/fault_handling.c
   system/smp.c
+  system/paging_stubs.s
+  system/paging.c
 
 [Packages]
   MdePkg/MdePkg.dec

@@ -12,6 +12,7 @@
 #include "handlers/ucode.h"
 #include "handlers/ucode_execute.h"
 #include "handlers/cores.h"
+#include "system/paging.h"
 
 UINT8 payload_buffer[RESPONSE_PAYLOAD_SIZE];
 UINT8 response_buffer[RESPONSE_BUFFER_SIZE];
@@ -80,6 +81,9 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
             break;
         case MSG_SENDMACHINECODE:
             handle_send_machine_code(message + payload_offset, message_length - payload_offset, ctx);
+            break;
+        case MSG_GETPAGINGINFO:
+            handle_get_paging_info(message + payload_offset, message_length - payload_offset, ctx);
             break;
         
         default:

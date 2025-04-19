@@ -136,6 +136,9 @@ typedef struct CoreContext_s {
     void* idt_base;
     UINT64 idt_limit;
 
+    // updated on core start and when requested
+    void* cr3_value;
+
     // flags used to control the core state
     // read and written from core_id and core 0
     // even though these are 1 bit flags, they are
