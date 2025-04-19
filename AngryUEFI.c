@@ -21,7 +21,7 @@
 #include "AngryUEFI.h"
 #include "stubs.h"
 #include "handlers/ucode.h"
-#include "smp.h"
+#include "system/smp.h"
 
 UINT8 receive_buffer[RECEIVE_BUFFER_SIZE];
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *TextOutput;

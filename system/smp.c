@@ -1,4 +1,4 @@
-#include "smp.h" // keep at the top to define EFI_AP_PROCEDURE, not defined in EDK2
+#include "system/smp.h" // keep at the top to define EFI_AP_PROCEDURE, not defined in EDK2
 
 #include <Uefi.h>
 #include <Library/UefiBootServicesTableLib.h>

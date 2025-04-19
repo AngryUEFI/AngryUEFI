@@ -12,10 +12,10 @@
 #include "Protocol.h"
 #include "AngryUEFI.h"
 #include "stubs.h"
-#include "smp.h"
+#include "system/smp.h"
 #include "handlers/ucode.h"
 #include "handlers/cores.h"
-#include "handlers/fault_handling.h"
+#include "system/fault_handling.h"
 
 static EFI_STATUS check_job_parameters(JobParameters* job_parameters, ConnectionContext* ctx) {
     if (job_parameters->ucode_slot >= UCODE_SLOTS) {

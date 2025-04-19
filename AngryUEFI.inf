@@ -25,13 +25,13 @@
   AngryUEFI.c
   Protocol.c
   stubs.s
-  smp.c
   handlers/debug.c
   handlers/ucode.c
   handlers/ucode_execute.c
   handlers/cores.c
-  handlers/fault_handling_stubs.s
-  handlers/fault_handling.c
+  system/fault_handling_stubs.s
+  system/fault_handling.c
+  system/smp.c
 
 [Packages]
   MdePkg/MdePkg.dec

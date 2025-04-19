@@ -14,7 +14,7 @@
 #include "data/ucode-original-0x17-0x71.h"
 #include "data/ucode-original-0x19-0x21.h"
 #include "handlers/ucode_execute.h"
-#include "handlers/fault_handling.h"
+#include "system/fault_handling.h"
 
 #define ORIGINAL_UCODE ucode_original_0x17_0x71
 #define ORIGINAL_UCODE_LEN ucode_original_0x17_0x71_len

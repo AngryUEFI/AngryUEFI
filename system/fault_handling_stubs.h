@@ -3,7 +3,7 @@
 
 #include <Base.h>
 
-#include "handlers/fault_handling.h"
+#include "system/fault_handling.h"
 
 extern UINT64 proto_fault_stub_start;
 extern UINT64 proto_handlers_end;

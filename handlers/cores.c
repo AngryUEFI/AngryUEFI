@@ -9,12 +9,12 @@
 #include <Library/MemoryAllocationLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 
-#include "smp.h"
+#include "system/smp.h"
 #include "stubs.h"
 #include "Protocol.h"
 
-#include "handlers/fault_handling.h"
-#include "handlers/fault_handling_stubs.h"
+#include "system/fault_handling.h"
+#include "system/fault_handling_stubs.h"
 
 void lock_context(CoreContext* context) {
     // spin loop until we get the lock

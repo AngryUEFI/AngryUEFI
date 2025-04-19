@@ -11,7 +11,7 @@
 
 #include "Protocol.h"
 #include "AngryUEFI.h"
-#include "smp.h"
+#include "system/smp.h"
 
 EFI_STATUS handle_ping(UINT8* payload, UINTN payload_length, ConnectionContext* ctx) {
     PrintDebug(L"Handling PING message.\n");

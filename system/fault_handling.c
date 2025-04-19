@@ -7,7 +7,7 @@
 #include <Library/MemoryAllocationLib.h>
 
 #include "handlers/cores.h"
-#include "handlers/fault_handling_stubs.h"
+#include "system/fault_handling_stubs.h"
 
 void init_fault_handlers_on_core(CoreContext* context) {
     CoreFaultInfo* fault_info = AllocateZeroPool(sizeof(CoreFaultInfo));
