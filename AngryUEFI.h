@@ -1,5 +1,5 @@
-#ifndef ANGRYUEIF_H
-#define ANGRYUEIF_H
+#ifndef ANGRYUEFI_H
+#define ANGRYUEFI_H
 
 #include <Base.h>
 #include <Library/BaseLib.h>
@@ -37,4 +37,4 @@ typedef struct ConnectionContext_s ConnectionContext;
 EFI_STATUS send_message(void* message, UINTN message_size, ConnectionContext* ctx);
 VOID EFIAPI DummyNotiftyFunction(IN EFI_EVENT Event, IN VOID *Context);
 
-#endif /* ANGRYUEIF_H */
+#endif /* ANGRYUEFI_H */

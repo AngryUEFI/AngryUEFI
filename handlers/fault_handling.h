@@ -10,6 +10,7 @@
 // AngryCAT python code might read some offsets, check that code after edits here
 // prefer to add new fields at the end, AngryCAT can deal with longer buffers
 // zeroed unless fault occurs
+#pragma pack(push,1)
 typedef struct CoreFaultInfo_s {
     // zeroed when starting a new job
     UINT64 fault_occured; // + 0x0
@@ -47,6 +48,7 @@ typedef struct CoreFaultInfo_s {
     // before switch to ISR
     UINT64 original_rsp; // + 0xD0
 } CoreFaultInfo;
+#pragma pack(pop)
 
 void init_fault_handlers_on_core(CoreContext* context);
 SMP_SAFE void write_idt_on_core(CoreContext* context);

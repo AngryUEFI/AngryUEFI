@@ -433,4 +433,4 @@ core_main_loop_stub_recovery:
 
     # branch to actual main loop
     # RDI = context
-    jmp core_main_loop_stub_recovery
+    jmp core_main_loop

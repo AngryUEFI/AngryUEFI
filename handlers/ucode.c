@@ -16,8 +16,8 @@
 #include "handlers/ucode_execute.h"
 #include "handlers/fault_handling.h"
 
-#define ORIGINAL_UCODE ucode_original_0x19_0x21
-#define ORIGINAL_UCODE_LEN ucode_original_0x19_0x21_len
+#define ORIGINAL_UCODE ucode_original_0x17_0x71
+#define ORIGINAL_UCODE_LEN ucode_original_0x17_0x71_len
 
 UcodeContainer ucodes[UCODE_SLOTS] = {0};
 MachineCodeContainer machine_codes[MACHINE_CODE_SLOTS] = {0};
