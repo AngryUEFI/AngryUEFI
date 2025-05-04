@@ -258,6 +258,9 @@ EFI_STATUS handle_apply_ucode_execute_test(UINT8* payload, UINTN payload_length,
             // set LSB to indicate timeout was reached
             flags |= 0x1;
         }
+        if (context->fault_info != NULL && context->fault_info->fault_occured == 1) {
+            flags |= 0x2;
+        }
     }
 
     status = send_result_message(context, flags, TRUE, ctx);
