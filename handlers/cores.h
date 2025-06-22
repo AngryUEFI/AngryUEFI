@@ -64,6 +64,8 @@ typedef struct CoreFunctionCall_s {
 } CoreFunctionCall;
 
 typedef struct CoreFaultInfo_s CoreFaultInfo;
+typedef struct UcodeContainer_s UcodeContainer;
+typedef struct MachineCodeContainer_s MachineCodeContainer;
 
 // each core gets its own copy of this control structure
 // jobs operate on this structure
@@ -81,20 +83,26 @@ typedef struct CoreContext_s {
     // machine code, which is not visible in stubs.s
 
     // zeroed before job execution
-    void* result_buffer; // + 0
-    UINT64 result_buffer_len; // + 8
+    void* result_buffer;                            // + 0x0
+    UINT64 result_buffer_len;                       // + 0x8
     // undefined contents on job entry
-    void* scratch_space; // + 16
-    UINT64 scratch_space_len; // + 24
-    void* current_machine_code_slot_address; // + 32
-    void* current_microcode_slot_address; // + 40
-    UINT64 core_id; // + 48
-    UINT64 ret_gpf_value; // + 56
-    UINT64 ret_rdtsc_value; // + 64
-    CoreFaultInfo* fault_info; // + 72
+    void* scratch_space;                            // + 0x10
+    UINT64 scratch_space_len;                       // + 0x18
+    void* current_machine_code_slot_address;        // + 0x20
+    void* current_microcode_slot_address;           // + 0x28
+    UINT64 core_id;                                 // + 0x30
+    UINT64 ret_gpf_value;                           // + 0x38
+    UINT64 ret_rdtsc_value;                         // + 0x40
+    CoreFaultInfo* fault_info;                      // + 0x48
     // during init the RSP is stored here
     // after recovery RSP is restored to this value
-    UINT64 recovery_rsp; // + 80
+    UINT64 recovery_rsp;                            // + 0x50
+
+    // allows accessing other ucode slots if needed
+    UcodeContainer* ucode_containers;               // + 0x58
+
+    // allows accessing other machien code slots if needed
+    MachineCodeContainer* machine_code_containers;  // + 0x60
 
     // add new fields for asm stubs above this line,
     // but not in the middle of existing fields

@@ -13,6 +13,7 @@ EFI_STATUS handle_apply_ucode(UINT8* payload, UINTN payload_length, ConnectionCo
 EFI_STATUS handle_read_msr(UINT8* payload, UINTN payload_length, ConnectionContext* ctx);
 EFI_STATUS handle_read_msr_on_core(UINT8* payload, UINTN payload_length, ConnectionContext* ctx);
 
+// referenced in ASM accessible region in CoreContext
 #pragma pack(push, 1)
 typedef struct UcodeContainer_s {
     UINT8* ucode;

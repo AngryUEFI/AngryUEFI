@@ -13,11 +13,14 @@
 #include "stubs.h"
 #include "data/ucode-original-0x17-0x71.h"
 #include "data/ucode-original-0x19-0x21.h"
+#include "data/ucode-template-0x00870F10.h"
+#include "data/ucode-template-0x00A20F12.h"
+#include "data/ucode-template-0x00A60F12.h"
 #include "handlers/ucode_execute.h"
 #include "system/fault_handling.h"
 
-#define ORIGINAL_UCODE ucode_original_0x17_0x71
-#define ORIGINAL_UCODE_LEN ucode_original_0x17_0x71_len
+#define ORIGINAL_UCODE ucode_cpu00870F10_template
+#define ORIGINAL_UCODE_LEN ucode_cpu00870F10_template_len
 
 UcodeContainer ucodes[UCODE_SLOTS] = {0};
 MachineCodeContainer machine_codes[MACHINE_CODE_SLOTS] = {0};

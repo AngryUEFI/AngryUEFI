@@ -12,6 +12,7 @@ EFI_STATUS handle_get_last_test_result(UINT8* payload, UINTN payload_length, Con
 
 void init_ucode_execute();
 
+// referenced in ASM accessible region in CoreContext
 #pragma pack(push, 1)
 typedef struct MachineCodeContainer_s {
     UINT8* machine_code;
