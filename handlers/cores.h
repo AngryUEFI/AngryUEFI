@@ -101,7 +101,7 @@ typedef struct CoreContext_s {
     // allows accessing other ucode slots if needed
     UcodeContainer* ucode_containers;               // + 0x58
 
-    // allows accessing other machien code slots if needed
+    // allows accessing other machine code slots if needed
     MachineCodeContainer* machine_code_containers;  // + 0x60
 
     // add new fields for asm stubs above this line,
