@@ -1,0 +1,101 @@
+name: Build AngryUEFI
+
+env:
+  CI_RUN: 1
+  GITHUB_WORKSPACE: ${{ github.workspace }}
+
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: cache Submodules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./AngryEDK2/CryptoPkg
+            ./AngryEDK2/UnitTestFrameworkPkg
+            ./AngryEDK2/MdeModulePkg
+            ./AngryEDK2/BaseTools
+            ./AngryEDK2/RedfishPkg
+            ./AngryEDK2/MdePkg
+            ./AngryEDK2/SecurityPkg
+          key: AngryUEFI-Submodules
+      - name: cache Build
+        uses: actions/cache@v4
+        with:
+          path: ./AngryEDK2/Build
+          key: AngryUEFI-Build
+      - name: clone AngryEDK2
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.ANGRYEDK2_REPO }}
+          token: ${{ secrets.AngryEDK2_PAT }}
+          submodules: false
+          path: AngryEDK2/
+          ref: master
+      - run: cd AngryEDK2/ && git rm AngryUEFI
+      - run: cd AngryEDK2/ && git submodule update --init --depth 1
+      - name: clone AngryUEFI
+        uses: actions/checkout@v4
+        with:
+          path: AngryUEFI/
+      - run: mv AngryUEFI AngryEDK2/
+      - name: Init
+        uses: ./AngryEDK2/AngryUEFI/.github/actions/init-edk2-action
+        with:
+          angryedk-docker-base-path: ${{ vars.ANGRYEDK_DOCKER_BASE_PATH }}
+      - name: Build AngryUEFI
+        uses: ./AngryEDK2/AngryUEFI/.github/actions/build-angryuefi-action
+        with:
+          angryedk-docker-base-path: ${{ vars.ANGRYEDK_DOCKER_BASE_PATH }}
+      - name: Build OVMF
+        uses: ./AngryEDK2/AngryUEFI/.github/actions/build-ovmf-action
+        with:
+          angryedk-docker-base-path: ${{ vars.ANGRYEDK_DOCKER_BASE_PATH }}
+      - name: Upload AngryUEFI
+        uses: actions/upload-artifact@v4
+        with:
+          name: AngryUEFI.efi
+          path: ./AngryEDK2/Build/EmulatorX64/RELEASE_GCC5/X64/AngryUEFI.efi
+      - name: Upload EFI Shell
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shell.efi
+          path: ./AngryEDK2/Build/OvmfX64/RELEASE_GCC5/X64/Shell.efi
+
+  package:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: clone AngryEDK2
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.ANGRYEDK2_REPO }}
+          token: ${{ secrets.AngryEDK2_PAT }}
+          submodules: false
+          path: AngryEDK2/
+          ref: master
+      - name: Download AngryUEFI
+        uses: actions/download-artifact@v4
+        with:
+          name: AngryUEFI.efi
+          path: ./AngryEDK2/Build/AngryUEFI/
+      - name: Download EFI Shell
+        uses: actions/download-artifact@v4
+        with:
+          name: Shell.efi
+          path: ./AngryEDK2/Build/OvmfX64/RELEASE_GCC5/X64/
+      - run: sudo apt-get update && sudo apt-get install -y mtools parted grub-efi-amd64-bin dosfstools udev
+      - run: ./AngryEDK2/prepare-image.sh
+      - name: Upload Floppy Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: AngryUEFI.img
+          path: ./AngryEDK2/Build/AngryUEFI/AngryUEFI.img
+      - run: ./AngryEDK2/create-bootable-usb-image.sh
+      - name: Upload USB Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: AngryUEFI_USB.img.tar.bz2
+          path: ./AngryEDK2/Build/AngryUEFI/AngryUEFI_USB.img.tar.bz2

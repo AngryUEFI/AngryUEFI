@@ -1,0 +1,13 @@
+name: Init AngryEDK2
+description: Init the EDK2 files
+inputs:
+  angryedk-docker-base-path:
+    description: 'Base path to use in docker container'
+    required: true
+
+
+runs:
+  using: docker
+  image: docker://ghcr.io/tianocore/containers/ubuntu-22-test
+  args:
+    - ${{inputs.angryedk-docker-base-path}}/init-docker.sh

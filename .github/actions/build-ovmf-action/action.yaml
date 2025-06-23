@@ -1,0 +1,11 @@
+name: Build OVMF
+description: Produces the EFI shell
+inputs:
+  angryedk-docker-base-path:
+    description: 'Base path to use in docker container'
+    required: true
+runs:
+  using: docker
+  image: docker://ghcr.io/tianocore/containers/ubuntu-22-test
+  args:
+    - ${{inputs.angryedk-docker-base-path}}/build-ovmf-docker.sh
