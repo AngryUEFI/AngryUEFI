@@ -74,22 +74,22 @@ jobs:
         uses: christopherhx/gitea-download-artifact@v4
         with:
           name: AngryUEFI.efi
-          path: ./AngryEDK2/Build/AngryUEFI/AngryUEFI.efi
+          path: ./AngryEDK2/Build/AngryUEFI/
       - name: Download EFI Shell
         uses: christopherhx/gitea-download-artifact@v4
         with:
           name: Shell.efi
-          path: ./AngryEDK2/Build/OvmfX64/RELEASE_GCC5/X64/Shell.efi
-      - run: apt-get update && apt-get install -y mtools grub-efi-amd64 grub2-common dosfstools parted
+          path: ./AngryEDK2/Build/OvmfX64/RELEASE_GCC5/X64/
+      - run: apt-get update && apt-get install -y mtools parted grub-efi-amd64-bin dosfstools udev
       - run: ./AngryEDK2/prepare-image.sh
       - name: Upload Floppy Image
         uses: christopherhx/gitea-upload-artifact@v4
         with:
           name: AngryUEFI.img
           path: ./AngryEDK2/Build/AngryUEFI/AngryUEFI.img
-      # - run: ./AngryEDK2/create-bootable-usb-image.sh
-      # - name: Upload USB Image
-      #   uses: christopherhx/gitea-upload-artifact@v4
-      #   with:
-      #     name: AngryUEFI_USB.img.tar.bz2
-      #     path: ./AngryEDK2/Build/AngryUEFI/AngryUEFI_USB.img.tar.bz2
+      - run: ./AngryEDK2/create-bootable-usb-image.sh
+      - name: Upload USB Image
+        uses: christopherhx/gitea-upload-artifact@v4
+        with:
+          name: AngryUEFI_USB.img.tar.bz2
+          path: ./AngryEDK2/Build/AngryUEFI/AngryUEFI_USB.img.tar.bz2
