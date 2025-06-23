@@ -11,16 +11,9 @@
 #include "Protocol.h"
 #include "AngryUEFI.h"
 #include "stubs.h"
-#include "data/ucode-original-0x17-0x71.h"
-#include "data/ucode-original-0x19-0x21.h"
-#include "data/ucode-template-0x00870F10.h"
-#include "data/ucode-template-0x00A20F12.h"
-#include "data/ucode-template-0x00A60F12.h"
 #include "handlers/ucode_execute.h"
 #include "system/fault_handling.h"
-
-#define ORIGINAL_UCODE ucode_cpu00870F10_template
-#define ORIGINAL_UCODE_LEN ucode_cpu00870F10_template_len
+#include "data/ucode/ucode_db.h"
 
 UcodeContainer ucodes[UCODE_SLOTS] = {0};
 MachineCodeContainer machine_codes[MACHINE_CODE_SLOTS] = {0};
@@ -91,7 +84,7 @@ EFI_STATUS handle_flip_bits(UINT8* payload, UINTN payload_length, ConnectionCont
     if (target_slot != 1) {
         if (ucodes[1].ucode == NULL) {
             ucodes[1].ucode = AllocateZeroPool(UCODE_SIZE);
-            ucodes[1].length = ORIGINAL_UCODE_LEN;
+            ucodes[1].length = UCODE_SIZE;
         }
         CopyMem(ucodes[1].ucode, ucodes[target_slot].ucode, ucodes[target_slot].length);
         ucodes[1].length = ucodes[target_slot].length;
@@ -307,11 +300,19 @@ void log_panic() {
 // this allows slot 0 to be used like any other slot
 // this is important to replace the known good update if needed
 static void ensure_ucode_slot_0() {
+    UINT32 my_cpuid = call_cpuid(1);
+    const UcodeDBEntry* db_entry = get_update_for_cpuid(my_cpuid);
+    if (db_entry == NULL) {
+        FormatPrint(L"Warning: No known good update for CPUID 0x%x! Load ucode slot 0!\n", my_cpuid);
+    }
     if (ucodes[0].ucode == NULL) {
         ucodes[0].ucode = AllocateZeroPool(UCODE_SIZE);
-        CopyMem(ucodes[0].ucode, ORIGINAL_UCODE, ORIGINAL_UCODE_LEN);
-        ucodes[0].length = ORIGINAL_UCODE_LEN;
-
+        ucodes[0].length = UCODE_SIZE;
+        if (db_entry != NULL) {
+            CopyMem(ucodes[0].ucode, db_entry->update, db_entry->update_length);
+            ucodes[0].length = db_entry->update_length;
+        }
+        
         original_ucode = ucodes[0].ucode;
     }
 }

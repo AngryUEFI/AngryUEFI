@@ -34,6 +34,7 @@
   system/smp.c
   system/paging_stubs.s
   system/paging.c
+  data/ucode/ucode_db.c
 
 [Packages]
   MdePkg/MdePkg.dec

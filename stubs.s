@@ -234,6 +234,15 @@ gpf_handler:
     add $8, %rsp
     iretq
 
+    .global call_cpuid
+    .type call_cpuid, @function
+call_cpuid:
+    #   RDI = leaf/eax value
+    xor %rax, %rax
+    mov %edi, %eax
+    cpuid
+    ret
+
 .extern original_ucode
 
 

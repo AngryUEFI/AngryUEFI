@@ -27,4 +27,6 @@ void write_idt_position();
 
 void gpf_handler();
 
+SMP_SAFE UINT32 call_cpuid(UINT32 leaf);
+
 #endif /* STUBS_H */
