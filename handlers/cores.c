@@ -12,8 +12,7 @@
 #include "system/smp.h"
 #include "stubs.h"
 #include "Protocol.h"
-#include "ucode.h"
-#include "ucode_execute.h"
+#include "asr/asr.h"
 
 #include "system/fault_handling.h"
 #include "system/fault_handling_stubs.h"
@@ -401,8 +400,8 @@ static void init_core_contexts() {
         current->scratch_space = AllocateZeroPool(MACHINE_CODE_SCRATCH_SPACE_SIZE);
         current->scratch_space_len = MACHINE_CODE_SCRATCH_SPACE_SIZE;
         current->core_id = i;
-        current->ucode_containers = ucodes;
-        current->machine_code_containers = machine_codes;
+        current->asr_gate = call_asr_for_index;
+        current->asr_registry = get_default_asr_registry();
         if (i < core_count) {
             current->present = 1;
         }

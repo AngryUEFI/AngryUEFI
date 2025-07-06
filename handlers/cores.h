@@ -64,8 +64,7 @@ typedef struct CoreFunctionCall_s {
 } CoreFunctionCall;
 
 typedef struct CoreFaultInfo_s CoreFaultInfo;
-typedef struct UcodeContainer_s UcodeContainer;
-typedef struct MachineCodeContainer_s MachineCodeContainer;
+typedef struct ASREntry_s ASREntry;
 
 // each core gets its own copy of this control structure
 // jobs operate on this structure
@@ -98,11 +97,9 @@ typedef struct CoreContext_s {
     // after recovery RSP is restored to this value
     UINT64 recovery_rsp;                            // + 0x50
 
-    // allows accessing other ucode slots if needed
-    UcodeContainer* ucode_containers;               // + 0x58
-
-    // allows accessing other machine code slots if needed
-    MachineCodeContainer* machine_code_containers;  // + 0x60
+    // ASR call gate
+    // see call_asr_for_index in asr.h for details
+    void* asr_gate;                                 // + 0x58
 
     // add new fields for asm stubs above this line,
     // but not in the middle of existing fields
@@ -146,6 +143,9 @@ typedef struct CoreContext_s {
 
     // updated on core start and when requested
     void* cr3_value;
+
+    // ASR registry for this core
+    ASREntry* asr_registry;
 
     // flags used to control the core state
     // read and written from core_id and core 0

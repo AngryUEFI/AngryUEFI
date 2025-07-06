@@ -35,6 +35,9 @@
   system/paging_stubs.s
   system/paging.c
   data/ucode/ucode_db.c
+  asr/asr_stubs.s
+  asr/asr.c
+  asr/sysinfo.c
 
 [Packages]
   MdePkg/MdePkg.dec
