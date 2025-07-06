@@ -65,6 +65,7 @@ typedef struct CoreFunctionCall_s {
 
 typedef struct CoreFaultInfo_s CoreFaultInfo;
 typedef struct ASREntry_s ASREntry;
+typedef struct IBSControl_s IBSControl;
 
 // each core gets its own copy of this control structure
 // jobs operate on this structure
@@ -146,6 +147,9 @@ typedef struct CoreContext_s {
 
     // ASR registry for this core
     ASREntry* asr_registry;
+
+    // IBS handling stores state here
+    IBSControl* ibs_control;
 
     // flags used to control the core state
     // read and written from core_id and core 0

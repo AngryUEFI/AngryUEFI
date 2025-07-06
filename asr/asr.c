@@ -7,10 +7,19 @@
 // last entry must be all zero
 
 #include "sysinfo.h"
+#include "ibs.h"
 
 ASREntry asr_registry[] = {
     {0x1001, get_ucode_slot_addr},
     {0x1002, get_machine_slot_addr},
+
+    {0x10001, clear_ibs},
+    {0x10002, set_ibs_offset},
+    {0x10003, start_ibs},
+    {0x10004, start_with_ibs_offset},
+    {0x10005, clear_start_with_ibs_offset},
+    // {0x10011, get_current_ibs_event_count},
+    // {0x10012, get_max_ibs_event_count},
     // zero entry to signal end of list
     {0, NULL}
 };

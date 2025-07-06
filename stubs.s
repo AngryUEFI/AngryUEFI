@@ -35,6 +35,20 @@ read_msr_stub:
     or %rdx, %rax
     ret
 
+    .global write_msr_stub
+    .type write_msr_stub, @function
+write_msr_stub:
+    # rdi - msr number
+    # rsi - value to write
+    movl %edi, %ecx
+    mov %rsi, %rax
+    mov %rsi, %rdx
+    shr $32, %rdx
+    wrmsr
+    shl $32, %rdx
+    or %rdx, %rax
+    ret
+
 .extern hook_gpf
 .extern unhook_gpf
 
@@ -238,9 +252,23 @@ gpf_handler:
     .type call_cpuid, @function
 call_cpuid:
     #   RDI = leaf/eax value
+    push %rbx
     xor %rax, %rax
     mov %edi, %eax
     cpuid
+    pop %rbx
+    ret
+
+    .global call_cpuid_ecx
+    .type call_cpuid_ecx, @function
+call_cpuid_ecx:
+    #   RDI = leaf/eax value
+    push %rbx
+    xor %rax, %rax
+    mov %edi, %eax
+    cpuid
+    pop %rbx
+    mov %ecx, %eax
     ret
 
 .extern original_ucode

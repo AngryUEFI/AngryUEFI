@@ -38,6 +38,8 @@
   asr/asr_stubs.s
   asr/asr.c
   asr/sysinfo.c
+  asr/ibs.c
+  asr/ibs_stubs.s
 
 [Packages]
   MdePkg/MdePkg.dec

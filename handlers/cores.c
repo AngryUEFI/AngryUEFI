@@ -13,6 +13,7 @@
 #include "stubs.h"
 #include "Protocol.h"
 #include "asr/asr.h"
+#include "asr/ibs.h"
 
 #include "system/fault_handling.h"
 #include "system/fault_handling_stubs.h"
@@ -107,6 +108,9 @@ void core_main_loop(CoreContext* context) {
 
     // update cr3
     context->cr3_value = get_cr3();
+
+    // (re-)init IBS
+    init_ibs_on_core(context);
 
     // ready for work :)
     context->started = 1;
@@ -402,6 +406,7 @@ static void init_core_contexts() {
         current->core_id = i;
         current->asr_gate = call_asr_for_index;
         current->asr_registry = get_default_asr_registry();
+        init_ibs_for_context(current);
         if (i < core_count) {
             current->present = 1;
         }
