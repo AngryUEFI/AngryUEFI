@@ -5,7 +5,7 @@
 
 #include "asr.h"
 
-#define MAX_IBS_ENTRIES 16384 // 512 = 1KB payload for response
+#define MAX_IBS_ENTRIES 16384 // 64 = 1KB payload for response
 
 // IBS (instruction based sampling) realted ASRs and helpers
 // namespace 0x10000
@@ -87,12 +87,12 @@ typedef struct IBSEvent_s {
     union {
         UINT64 val;
         struct {
-            // 56 bit MSR
+            // 48 bit MSR
             // lower 12 bits are the same as virtual
             // -> shift out lower 12 bits to make room for status flags
             // take the lower 12 bits from the virtual address, even if the virtual
             // address is marked as invalid
-            UINT64 phys:44;
+            UINT64 phys:36;
             // IbsOpMicrocode. 1=Tagged operation from microcode
             UINT8 microcode:1;
             // DataSrc: northbridge IBS request data source
@@ -115,7 +115,7 @@ typedef struct IBSEvent_s {
             // IbsOpVal: micro-op sample valid
             // if for some reason no data was captured the rest of the fields might be UD
             UINT8 valid:1;
-            UINT8 reserved:5;
+            UINT16 reserved:13;
         } fields;
       } q1;
       // 64 bit MSR

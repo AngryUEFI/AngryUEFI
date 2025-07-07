@@ -4,7 +4,7 @@
 #include "Protocol.h"
 #include "asr/ibs.h"
 
-#define MAX_IBS_EVENTS_PER_PACKET 512
+#define MAX_IBS_EVENTS_PER_PACKET 64
 
 static EFI_STATUS check_core_id(UINT64 core_id, ConnectionContext* ctx) {
     if (core_id >= MAX_CORE_COUNT) {
@@ -80,6 +80,10 @@ EFI_STATUS handle_get_ibs_buffer(UINT8* payload, UINTN payload_length, Connectio
     response_u64[2] = (UINT64)get_max_ibs_event_count(context); // max stored events
     response_u64[3] = 0; // number of events in response
 
+    if (entry_count == 0) {
+        // 0 -> request everything
+        entry_count = stored_events;
+    }
     UINT64 events_to_send = MIN(entry_count, stored_events - start_index);
     if (stored_events <= start_index || entry_count == 0 || events_to_send == 0) {
         // request out of bound -> send no events
