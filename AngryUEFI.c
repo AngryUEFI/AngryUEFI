@@ -72,7 +72,7 @@ EFI_STATUS send_message(void* message, UINTN message_size, ConnectionContext* ct
 
     // Wait until the transmit completes.
     while (TxToken.CompletionToken.Status == EFI_NOT_READY) {
-        gBS->Stall(1000); // 1ms
+        gBS->Stall(1); // 1ms
     }
     if (EFI_ERROR(TxToken.CompletionToken.Status)) {
         FormatPrintDebug(L"Error: TCP Transmit completed with error: %r\n", TxToken.CompletionToken.Status);
