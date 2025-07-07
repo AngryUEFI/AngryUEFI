@@ -16,6 +16,7 @@
 #include <Protocol/Dhcp4.h>
 #include <Protocol/Tcp4.h>
 #include <Protocol/ServiceBinding.h>
+#include <Protocol/LoadedImage.h>
 
 #include "Protocol.h"
 #include "AngryUEFI.h"
@@ -242,22 +243,34 @@ AngryUEFI(
         return Status;
     }
 
-    Print(L"Hello UEFI!\n");
-    FormatPrintDebug(L"Hello %u Format!\n", 42);
+    Print(L"Hello UEFI!\n\r");
+    FormatPrintDebug(L"Hello %u Format!\n\r", 42);
+
+    EFI_LOADED_IMAGE_PROTOCOL   *LoadedImage;
+
+    // Open the protocol on our own ImageHandle
+    Status = gBS->OpenProtocol(
+                    ImageHandle,
+                    &gEfiLoadedImageProtocolGuid,
+                    (VOID**)&LoadedImage,
+                    ImageHandle,
+                    NULL,
+                    EFI_OPEN_PROTOCOL_GET_PROTOCOL
+                );
+
+
+    // Now LoadedImage->ImageBase is the mapping base address of this image
+    UINT64 Base      = (UINT64)(LoadedImage->ImageBase);
+    FormatPrint(L"AngryUEFI base: 0x%p\n\r", Base);
+
 
     init_smp();
 
     UINT64 ret = test_stub(0x123456789ABCDEF0ull, 0x0FEDCBA987654321ull);
     UINT64 expected = (0x123456789ABCDEF0ull + 0x0FEDCBA987654321ull) ^ 0xdeadbeefdeadc0deull;
     if (ret != expected) {
-        FormatPrint(L"test stub returned invalid. got 0x%016llX, expected 0x%016llX.\n", ret, expected);
+        FormatPrint(L"test stub returned invalid. got 0x%016llX, expected 0x%016llX.\n\r", ret, expected);
     }
-
-    read_idt_position();
-    UINT8* idt_structure = read_idt_position();
-    UINT8* idf_addr = (idt_structure+2);
-    UINT16 idf_size = *(UINT16*)idt_structure;
-    FormatPrint(L"IDT is at 0x%016X, length %u.\n", idf_addr, idf_size);
 
     init_ucode();
     
@@ -268,11 +281,11 @@ AngryUEFI(
                                      &HandleCount,
                                      &HandleBuffer);
     if (EFI_ERROR(Status) || HandleCount == 0) {
-        FormatPrint(L"Error: Could not locate TCP4 Service Binding handles: %r\n", Status);
+        FormatPrint(L"Error: Could not locate TCP4 Service Binding handles: %r\n\r", Status);
         return Status;
     }
 
-    Print(L"Got TCP4 Service Binding Handle.\n");
+    Print(L"Got TCP4 Service Binding Handle.\n\r");
 
     // For simplicity, use the first available handle.
     Status = gBS->OpenProtocol(HandleBuffer[0],
@@ -282,19 +295,19 @@ AngryUEFI(
                                  NULL,
                                  EFI_OPEN_PROTOCOL_GET_PROTOCOL);
     if (EFI_ERROR(Status)) {
-        FormatPrint(L"Error: Could not get TCP4 Service Binding interface: %r\n", Status);
+        FormatPrint(L"Error: Could not get TCP4 Service Binding interface: %r\n\r", Status);
         goto CLEANUP;
     }
 
-    Print(L"Got TCP4 Service Binding Interface.\n");
+    Print(L"Got TCP4 Service Binding Interface.\n\r");
 
     // Create a child instance for the TCP4 protocol.
     Status = Tcp4ServiceBinding->CreateChild(Tcp4ServiceBinding, &Tcp4ChildHandle);
     if (EFI_ERROR(Status)) {
-        FormatPrint(L"Error: Could not create TCP4 child: %r\n", Status);
+        FormatPrint(L"Error: Could not create TCP4 child: %r\n\r", Status);
         goto CLEANUP;
     }
-    Print(L"Got TCP4 child.\n");
+    Print(L"Got TCP4 child.\n\r");
 
     Status = gBS->OpenProtocol(Tcp4ChildHandle,
                                  &gEfiTcp4ProtocolGuid,
@@ -303,10 +316,10 @@ AngryUEFI(
                                  NULL,
                                  EFI_OPEN_PROTOCOL_GET_PROTOCOL);
     if (EFI_ERROR(Status)) {
-        FormatPrint(L"Error: Could not get TCP4 protocol interface: %r\n", Status);
+        FormatPrint(L"Error: Could not get TCP4 protocol interface: %r\n\r", Status);
         goto CLEANUP;
     }
-    Print(L"Got TCP4 protocol interface.\n");
+    Print(L"Got TCP4 protocol interface.\n\r");
 
     // Zero and initialize the configuration data.
     ZeroMem(&Tcp4ConfigData, sizeof(Tcp4ConfigData));
@@ -325,10 +338,10 @@ AngryUEFI(
                               NULL,
                               &ListenToken.CompletionToken.Event);
     if (EFI_ERROR(Status)) {
-        FormatPrint(L"Error: Could not create event for ListenToken: %r\n", Status);
+        FormatPrint(L"Error: Could not create event for ListenToken: %r\n\r", Status);
         goto CLEANUP;
     }
-    Print(L"Got ListenToken event.\n");
+    Print(L"Got ListenToken event.\n\r");
 
     // Prepare a close token to signal connection closure.
     Status = gBS->CreateEvent(EVT_NOTIFY_SIGNAL,
@@ -337,10 +350,10 @@ AngryUEFI(
                               NULL,
                               &CloseToken.CompletionToken.Event);
     if (EFI_ERROR(Status)) {
-        FormatPrint(L"Error: Could not create event for CloseToken: %r\n", Status);
+        FormatPrint(L"Error: Could not create event for CloseToken: %r\n\r", Status);
         goto CLEANUP;
     }
-    Print(L"Got CloseToken event.\n");
+    Print(L"Got CloseToken event.\n\r");
 
     // Configure the TCP instance.
     Status = Tcp4->Configure(Tcp4, &Tcp4ConfigData);
@@ -357,38 +370,38 @@ AngryUEFI(
         Status = Tcp4->Configure(Tcp4, &Tcp4ConfigData);
     }
     else if (EFI_ERROR(Status)) {
-        FormatPrint(L"Error: TCP Configure failed: %r\n", Status);
+        FormatPrint(L"Error: TCP Configure failed: %r\n\r", Status);
         goto CLEANUP;
     }
-    Print(L"TCP Configured.\n");
+    Print(L"TCP Configured.\n\r");
 
     // The StationAddress holds the IPv4 address.
     UINT8 *ip = Ip4ModeData.ConfigData.StationAddress.Addr;
-    FormatPrint(L"Interface IP: %d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
+    FormatPrint(L"Interface IP: %u.%u.%u.%u\n\r", ip[0], ip[1], ip[2], ip[3]);
 
     // At this point, a connection is accepted. Enter the echo loop.
     for (;;) {
-        PrintDebug(L"Looping for new connection.\n");
+        PrintDebug(L"Looping for new connection.\n\r");
 
         // Start listening for incoming connections.
         ListenToken.CompletionToken.Status = EFI_NOT_READY;
         Status = Tcp4->Accept(Tcp4, &ListenToken);
         if (EFI_ERROR(Status)) {
-            FormatPrint(L"Error: TCP Listen failed: %r\n", Status);
+            FormatPrint(L"Error: TCP Listen failed: %r\n\r", Status);
             goto CLEANUP;
         }
 
-        PrintDebug(L"TCP Echo Server is listening on port 3239...\n");
+        PrintDebug(L"TCP Echo Server is listening on port 3239...\n\r");
 
         // Wait (busy-wait loop) until a connection is accepted.
         while (ListenToken.CompletionToken.Status == EFI_NOT_READY) {
             gBS->Stall(1000); // stall 1ms
         }
         if (EFI_ERROR(ListenToken.CompletionToken.Status)) {
-            FormatPrint(L"Error: Listen token completed with error: %r\n", ListenToken.CompletionToken.Status);
+            FormatPrint(L"Error: Listen token completed with error: %r\n\r", ListenToken.CompletionToken.Status);
             goto CLEANUP;
         }
-        PrintDebug(L"Got incoming connection.\n");
+        PrintDebug(L"Got incoming connection.\n\r");
 
         // An incoming TCP connection gets a new instance of the TCP protocol
         Status = gBS->OpenProtocol(ListenToken.NewChildHandle,
@@ -398,14 +411,14 @@ AngryUEFI(
                                 NULL,
                                 EFI_OPEN_PROTOCOL_GET_PROTOCOL);
         if (EFI_ERROR(Status)) {
-            FormatPrint(L"Error: Could not get incoming TCP4 protocol interface: %r\n", Status);
+            FormatPrint(L"Error: Could not get incoming TCP4 protocol interface: %r\n\r", Status);
             goto CLEANUP;
         }
-        PrintDebug(L"Got incoming TCP4 protocol interface.\n");
+        PrintDebug(L"Got incoming TCP4 protocol interface.\n\r");
 
         Status = receive_messages(IncomingTcp4);
          if (EFI_ERROR(Status)) {
-            FormatPrint(L"Unable to receive message: %r\n", Status);
+            FormatPrint(L"Unable to receive message: %r\n\r", Status);
             goto CLEANUP;
         }
 
