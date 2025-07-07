@@ -5,7 +5,7 @@
 
 #include "asr.h"
 
-#define MAX_IBS_ENTRIES 512 // = 1KB payload for response
+#define MAX_IBS_ENTRIES 16384 // 512 = 1KB payload for response
 
 // IBS (instruction based sampling) realted ASRs and helpers
 // namespace 0x10000

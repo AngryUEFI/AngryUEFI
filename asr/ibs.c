@@ -262,3 +262,11 @@ SMP_SAFE void* copy_ibs_entries(CoreContext* context, UINT8* target_buffer, UINT
 
     return (void*)(end_index - start_index);
 }
+
+SMP_SAFE void* get_current_ibs_event_count(CoreContext* context) {
+    return (void*)(context->ibs_control->current_position);
+}
+
+SMP_SAFE void* get_max_ibs_event_count(CoreContext* context) {
+    return (void*)MAX_IBS_ENTRIES;
+}

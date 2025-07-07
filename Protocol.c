@@ -12,6 +12,7 @@
 #include "handlers/ucode.h"
 #include "handlers/ucode_execute.h"
 #include "handlers/cores.h"
+#include "handlers/handle_isb.h"
 #include "system/paging.h"
 
 UINT8 payload_buffer[RESPONSE_PAYLOAD_SIZE];
@@ -85,10 +86,13 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
         case MSG_GETPAGINGINFO:
             handle_get_paging_info(message + payload_offset, message_length - payload_offset, ctx);
             break;
+        case MSG_GETIBSBUFFER:
+            handle_get_ibs_buffer(message + payload_offset, message_length - payload_offset, ctx);
+            break;
         
         default:
-            FormatPrintDebug(L"Unknown message type 0x%08X\n", message_type);
-            send_message(FormatBuffer, 0x80000001, ctx);
+            FormatPrint(L"Unknown message type 0x%08X\n", message_type);
+            send_status(0x80000001, FormatBuffer, ctx);
             break;
     }
 
