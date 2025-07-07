@@ -389,6 +389,11 @@ proto_fault_handlers_offsets:
 proto_fault_handlers_count:
     .quad 21
 
+    .global fallback_handler_offset
+    .type fallback_handler_offset, STT_OBJECT
+fallback_handler_offset:
+    .quad fallback_handler-proto_fault_stub_start
+
     .global set_idtr
     .type set_idtr, STT_FUNC
 set_idtr:

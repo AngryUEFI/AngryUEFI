@@ -264,9 +264,6 @@ static void InstallCustomGpfHandler() {
     // Calculate the number of entries in the IDT.
     UINTN IdtEntryCount = (IdtDesc->Limit + 1) / sizeof(IDT_ENTRY);
 
-    // For demonstration, print out the current IDT base (if you have a print function)
-    FormatPrint(L"Original IDT base = 0x%lx, limit = 0x%x\n", IdtDesc->Base, IdtDesc->Limit);
-
     // Get a pointer to the array of IDT entries.
     IDT_ENTRY *IdtEntries = (IDT_ENTRY*)(UINTN)IdtDesc->Base;
 

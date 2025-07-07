@@ -5,6 +5,7 @@
 // ASR registry
 // include your header here and add your ASR to the array
 // last entry must be all zero
+// keep list sorted by ASR number
 
 #include "sysinfo.h"
 #include "ibs.h"
@@ -28,6 +29,8 @@ ASREntry asr_registry[] = {
     {0, NULL}
 };
 
+// Note: for now this is a basic linear search
+// we require the list to be sorted in case we want binary search later
 SMP_SAFE void* get_asr_for_index(CoreContext* context, UINT64 asr_index) {
     UINTN i = 0;
     ASREntry* current = &context->asr_registry[i];

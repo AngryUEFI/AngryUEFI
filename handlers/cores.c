@@ -399,16 +399,22 @@ static void init_core_contexts() {
     UINTN core_count = get_available_cores();
     for (UINTN i = 0; i < MAX_CORE_COUNT; i++) {
         CoreContext* current = &core_contexts[i];
-        current->result_buffer = AllocateZeroPool(RESULT_BUFFER_SIZE);
-        current->result_buffer_len = RESULT_BUFFER_SIZE;
-        current->scratch_space = AllocateZeroPool(MACHINE_CODE_SCRATCH_SPACE_SIZE);
-        current->scratch_space_len = MACHINE_CODE_SCRATCH_SPACE_SIZE;
         current->core_id = i;
-        current->asr_gate = call_asr_for_index;
-        current->asr_registry = get_default_asr_registry();
-        init_ibs_for_context(current);
+        
         if (i < core_count) {
             current->present = 1;
+        }
+        
+        if (current->present != 0) {
+            current->result_buffer = AllocateZeroPool(RESULT_BUFFER_SIZE);
+            current->result_buffer_len = RESULT_BUFFER_SIZE;
+            current->scratch_space = AllocateZeroPool(MACHINE_CODE_SCRATCH_SPACE_SIZE);
+            current->scratch_space_len = MACHINE_CODE_SCRATCH_SPACE_SIZE;
+
+            current->asr_gate = call_asr_for_index;
+            current->asr_registry = get_default_asr_registry();
+
+            init_ibs_for_context(current);
         }
     }
 

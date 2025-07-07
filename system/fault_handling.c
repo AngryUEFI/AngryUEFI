@@ -18,6 +18,7 @@ void init_fault_handlers_on_core(CoreContext* context) {
     UINT8* fault_handlers = AllocatePool(fault_handlers_length);
     
     CopyMem(fault_handlers, &proto_fault_stub_start, fault_handlers_length);
+    FormatPrintDebug(L"Fault handlers are at %p.\n\r", fault_handlers);
     // first 8 Bytes are the core context pointer
     *(UINT64*)fault_handlers = (UINT64)context;
     
@@ -34,7 +35,7 @@ void init_fault_handlers_on_core(CoreContext* context) {
     // fill the IDT with our handlers
     for (UINTN i = 0; i <= highest_fault_handler; i++) {
         // fill all entries in IDT with our fallback_handler
-        UINT64 handler_address = (UINT64)fallback_handler;
+        UINT64 handler_address = (UINT64)fault_handlers + fallback_handler_offset;
         if (i < proto_fault_handlers_count) {
             // we have an actual handler for this fault
             // offset from start of handler buffer

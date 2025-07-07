@@ -18,6 +18,8 @@ SMP_SAFE void set_idtr(void* idt_base, UINT16 idt_length);
 // used as a placeholder for non-present handlers
 // writes 0x100 as fault number, no matter the fault
 void fallback_handler();
+// offset of the fallback handler from proto_fault_stub_start 
+extern UINT64 fallback_handler_offset;
 
 // called from core main loop entry point
 // saves recovery information to core context

@@ -12,7 +12,9 @@
 #define IBS_MSR_DC_Linear_Address 0xC0011038
 #define IBS_MSR_DC_Physical_Address 0xC0011039
 
-#define IBS_CPUID_LEAF 0x8000000
+#define IBS_CPUID_LEAF 0x80000001
+
+#define IA32_APIC_BASE_MSR 0x1B
 
 // "cAMD" from "AuthenticAMD"
 // might break with weird CPUs
@@ -20,10 +22,16 @@
 
 SMP_SAFE BOOLEAN is_ibs_supported() {
     if (call_cpuid_ecx(0) != AMD_VENDOR_CHECK) {
+        FormatPrintDebug(L"No IBS, wrong CPU Vendor 0x%x.\n\r", call_cpuid_ecx(0));
         return FALSE;
     }
     UINT32 val = call_cpuid_ecx(IBS_CPUID_LEAF);
-    return (val & (1 << 10)) != 0;
+    BOOLEAN ibs_supported = (val & (1 << 10)) != 0;
+    if (!ibs_supported) {
+        FormatPrintDebug(L"No IBS, cpuid signals no IBS, cpuid: 0x%x.\n\r", val);
+        return FALSE;
+    }
+    return TRUE;
 }
 
 void init_ibs_for_context(CoreContext* context) {
@@ -39,12 +47,25 @@ SMP_SAFE void init_ibs_on_core(CoreContext* context) {
     if (!is_ibs_supported()) {
         return;
     }
+
     // disable IBS if it is enabled
     IBS_OP_CTL val;
     val.val = read_msr_stub(IBS_MSR_IBS_Execution_Control);
     val.bits.IbsOpEn = 0; // zero IbsOpEn bit -> disable micro op sampling
     val.bits.IbsOpCntCtl = 1; // count micro ops instead of round robin counter
     write_msr_stub(IBS_MSR_IBS_Execution_Control, val.val);
+
+    // find the APIC and configure the IBS interrupt
+    UINT64 APIC_base = read_msr_stub(IA32_APIC_BASE_MSR);
+    // the IBS interrupt register is at position 0x500
+    // this is AMD's local vector table
+    // essentially this allows mapping certain interrupts to existing ISRs
+    volatile LVTEntry* ibs_reg = (LVTEntry*)(((UINT8*)APIC_base) + 0x500);
+    ibs_reg->bits.Vector = 0x2; // deliver to default NMI handler
+    ibs_reg->bits.MsgType = 0b100; // deliver as NMI
+    ibs_reg->bits.Mask = 1; // mask/disable interrupt, should be default after boot
+    // reason for mask: we read the result of IBS after the instruction under test
+    // no need to go through the whole interrupt handling
 
     // clear the IBS filter
     context->ibs_control->ibs_filter = IBS_FILTER_ALL;

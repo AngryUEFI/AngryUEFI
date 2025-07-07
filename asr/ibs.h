@@ -215,6 +215,19 @@ typedef union {
     } bits;
 } IBS_OP_DATA3_REGISTER;
 
+typedef union {
+    UINT32 val;
+    struct {
+      UINT32 Vector     :  8; // bits   7– 0: Interrupt vector number
+      UINT32 MsgType    :  3; // bits  10– 8: Message type
+      UINT32 Reserved1  :  1; // bit     11: Reserved (RAZ)
+      UINT32 DS         :  1; // bit     12: Delivery Status
+      UINT32 Reserved2  :  3; // bits 13–15: Reserved (RAZ)
+      UINT32 Mask       :  1; // bit     16: Mask (0=Not masked, 1=Masked)
+      UINT32 Reserved3  : 15; // bits 17–31: Reserved (RAZ)
+    } bits;
+} LVTEntry;
+
 #pragma pack(pop)
 
 #endif /* IBS_H */

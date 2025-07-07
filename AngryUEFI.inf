@@ -63,3 +63,4 @@
   gEfiTcp4ProtocolGuid
   gEfiTcp4ServiceBindingProtocolGuid
   gEfiMpServiceProtocolGuid
+  gEfiLoadedImageProtocolGuid
