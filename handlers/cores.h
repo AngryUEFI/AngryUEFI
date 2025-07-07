@@ -100,6 +100,7 @@ typedef struct CoreContext_s {
 
     // ASR call gate
     // see call_asr_for_index in asr.h for details
+    // not strictly a call gate, everything runs in Ring 0 anyway
     void* asr_gate;                                 // + 0x58
 
     // add new fields for asm stubs above this line,

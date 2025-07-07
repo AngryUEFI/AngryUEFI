@@ -18,8 +18,12 @@ ASREntry asr_registry[] = {
     {0x10003, start_ibs},
     {0x10004, start_with_ibs_offset},
     {0x10005, clear_start_with_ibs_offset},
+    {0x10006, store_ibs_entry},
+    {0x10007, clear_ibs_results},
+    {0x10008, clear_ibs_results_reset_filter},
     // {0x10011, get_current_ibs_event_count},
     // {0x10012, get_max_ibs_event_count},
+    // {0x10013, set_ibs_event_filter},
     // zero entry to signal end of list
     {0, NULL}
 };

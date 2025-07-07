@@ -12,7 +12,7 @@
 // you probably do not want to call this on Intel CPUs, here be dragons
 // the init functions will not do anything if is_ibs_supported() is false
 
-// clear the IBS buffer and prepare the core for a new sample run
+// clear the IBS registers to capture a new sample
 SMP_SAFE void* clear_ibs(CoreContext* context); // 0x10001
 
 // set the target offset in the IBS sample
@@ -30,6 +30,19 @@ SMP_SAFE void* start_with_ibs_offset(CoreContext* context, UINT64 ibs_offset); /
 
 // clear -> set offset -> start
 SMP_SAFE void* clear_start_with_ibs_offset(CoreContext* context, UINT64 ibs_offset); // 0x10005
+
+// store the current IBS entry into the result buffer
+// returns the free space left in the buffer
+// if no space left returns 0 and does not write anything
+SMP_SAFE void* store_ibs_entry(CoreContext* context);  // 0x10006
+
+// clear the IBS capture buffer in AngryUEFI
+// starts a new capture run
+// returns the number of events that can be captured in the buffer
+SMP_SAFE void* clear_ibs_results(CoreContext* context); // 0x10007
+
+// clears any filters and the result buffer
+SMP_SAFE void* clear_ibs_results_reset_filter(CoreContext* context); // 0x10008
 
 // number of events stored in the current buffer
 // will stop recording if the max amount is reached
@@ -57,52 +70,73 @@ SMP_SAFE void init_ibs_on_core(CoreContext* contex);
 // checks the CPUID entries
 SMP_SAFE BOOLEAN is_ibs_supported();
 
-// called from ISR to store the current IBS entry into the buffer
-SMP_SAFE void store_ibs_entry(CoreContext* context);
-
-// represents a single IBS trace event
-// q1.type one of ALU, READ[1-16], WRITE[1-16]
-// q1.low is the physical address for READ and WRITE
-// q2 is the virtual address for READ and WRITE
+// represents a single IBS event
+// bits are a bit weird to fit things into 2 quad words
+// primary use case is storing the event type
+// plus phys & virt addresses for load/store
+// if needed other event types can be stuffed in there as well
+// based on Zen 2 "Processor Programming Reference (PPR) for AMD Family 17h Model 71h, Revision B0 Processors"
 typedef struct IBSEvent_s {
     union {
-        UINT64 q1_all;
+        UINT64 val;
         struct {
-          UINT64 low:56;
-          UINT8  type:8;
-        } q1_fields;
+            // 56 bit MSR
+            // lower 12 bits are the same as virtual
+            // -> shift out lower 12 bits to make room for status flags
+            // take the lower 12 bits from the virtual address, even if the virtual
+            // address is marked as invalid
+            UINT64 phys:44;
+            // IbsOpMicrocode. 1=Tagged operation from microcode
+            UINT8 microcode:1;
+            // DataSrc: northbridge IBS request data source
+            // 7 -> MMIO/Config/PCI/APIC
+            UINT8 data_source:3;
+            // IbsOpMemWidth: load/store size in byte
+            UINT8 size:4;
+            // IbsSwPf: software prefetch. 1=The op is a software prefetch.
+            UINT8 prefetch:1;
+            // IbsDcPhyAddrValid: data cache physical address valid.
+            UINT8 phys_valid:1;
+            // IbsDcLinAddrValid: data cache linear address valid.
+            UINT8 linear_valid:1;
+            // IbsDcUcMemAcc: UC memory access (uncachable memory)
+            UINT8 uncachable:1;
+            // IbsStOp: store op
+            UINT8 store:1;
+            // IbsLdOp: load op
+            UINT8 load:1;
+            // IbsOpVal: micro-op sample valid
+            // if for some reason no data was captured the rest of the fields might be UD
+            UINT8 valid:1;
+            UINT8 reserved:5;
+        } fields;
       } q1;
+      // 64 bit MSR
+      // if virt valid contains that register
+      // if virt invalid, contains the upper 52 bits of that register
+      // and the lower 12 bits of the phys addr MSR
+      // strategic bit reserve: this is, according to the docs, a canonical address
+      // -> the upper bits should always the same and could be shifted out
+      // at that point it might be best to add another u64 to this struct
       UINT64 q2;
 } IBSEvent;
-
-// values for q1.type
-#define IBS_EMPTY 0x00
-#define IBS_ALU 0x01
-#define IBS_UNKNOWN 0xFF
-
-#define IBS_READ1 0x10
-#define IBS_READ2 0x11
-#define IBS_READ4 0x12
-#define IBS_READ8 0x13
-#define IBS_READ16 0x14
-
-#define IBS_WRITE1 0x20
-#define IBS_WRITE2 0x21
-#define IBS_WRITE4 0x22
-#define IBS_WRITE8 0x23
-#define IBS_WRITE16 0x24
 
 // IBS event filters
 // discards any events not matching the set filter
 #define IBS_FILTER_ALL 0x0
 #define IBS_FILTER_ALU 0x1
-#define IBS_FILTER_READ 0x2
-#define IBS_FILTER_WRITE 0x3
-#define IBS_FILTER_READ_WRITE 0x4
+#define IBS_FILTER_LOAD 0x2
+#define IBS_FILTER_STORE 0x3
+// store if load OR store (or both)
+#define IBS_FILTER_LOAD_STORE 0x4
+// store if both load AND store
+#define IBS_FILTER_UPDATE 0x5
 
 // control structure for IBS
 typedef struct IBSControl_s {
-    IBSEvent event_buffer;
+    IBSEvent* event_buffer;
+    // index of the next free slot
+    // if >= MAX_IBS_ENTRIES -> full
     UINT64 current_position;
     UINT64 ibs_filter;
 } IBSControl;
@@ -123,6 +157,63 @@ typedef union {
     UINT64 Reserved2        :  5;
   } bits;
 } IBS_OP_CTL;
+
+typedef union {
+    UINT64 val;
+    struct {
+      UINT64 Reserved1       : 23;
+      UINT64 IbsOpMicrocode  :  1;
+      UINT64 IbsOpBrnFuse    :  1;
+      UINT64 IbsRipInvalid   :  1;
+      UINT64 IbsOpBrnRet     :  1;
+      UINT64 IbsOpBrnMisp    :  1;
+      UINT64 IbsOpBrnTaken   :  1;
+      UINT64 IbsOpReturn     :  1;
+      UINT64 Reserved2       :  2;
+      UINT64 IbsTagToRetCtr  : 16;
+      UINT64 IbsCompToRetCtr : 16;
+    } bits;
+} IBS_OP_DATA_REGISTER;
+
+typedef union {
+    UINT64 val;
+    struct {
+      UINT64 Reserved1    : 58;
+      UINT64 CacheHitSt   :  1;
+      UINT64 RmtNode      :  1;
+      UINT64 Reserved2    :  1;
+      UINT64 DataSrc      :  3;
+    } bits;
+} IBS_OP_DATA2_REGISTER;
+
+typedef union {
+    UINT64 val;
+    struct {
+      UINT64 IbsLdOp               : 1;
+      UINT64 IbsStOp               : 1;
+      UINT64 IbsDcL1tlbMiss        : 1;
+      UINT64 IbsDcL2TlbMiss        : 1;
+      UINT64 IbsDcL1TlbHit2M       : 1;
+      UINT64 IbsDcL1TlbHit1G       : 1;
+      UINT64 IbsDcL2tlbHit2M       : 1;
+      UINT64 IbsDcMiss             : 1;
+      UINT64 IbsDcMisAcc           : 1;
+      UINT64 Reserved0             : 4;
+      UINT64 IbsDcWcMemAcc         : 1;
+      UINT64 IbsDcUcMemAcc         : 1;
+      UINT64 IbsDcLockedOp         : 1;
+      UINT64 DcMissNoMabAlloc      : 1;
+      UINT64 IbsDcLinAddrValid     : 1;
+      UINT64 IbsDcPhyAddrValid     : 1;
+      UINT64 IbsDcL2TlbHit1G       : 1;
+      UINT64 IbsL2Miss             : 1;
+      UINT64 IbsSwPf               : 1;
+      UINT64 IbsOpMemWidth         : 4;
+      UINT64 IbsOpDcMissOpenMemReqs: 6;
+      UINT64 IbsDcMissLat          : 16;
+      UINT64 IbsTlbRefillLat       : 16;
+    } bits;
+} IBS_OP_DATA3_REGISTER;
 
 #pragma pack(pop)
 
