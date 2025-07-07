@@ -25,6 +25,7 @@ ASREntry asr_registry[] = {
     // {0x10011, get_current_ibs_event_count},
     // {0x10012, get_max_ibs_event_count},
     // {0x10013, set_ibs_event_filter},
+    {0x10014, copy_ibs_entries},
     // zero entry to signal end of list
     {0, NULL}
 };

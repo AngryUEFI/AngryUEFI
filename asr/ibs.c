@@ -247,3 +247,18 @@ SMP_SAFE void* store_ibs_entry(CoreContext* context) {
     // return how much space is left in the buffer
     return (void*) (MAX_IBS_ENTRIES - context->ibs_control->current_position);
 }
+
+SMP_SAFE void* copy_ibs_entries(CoreContext* context, UINT8* target_buffer, UINT64 start_index, UINT64 entry_count) {
+    IBSControl* status = context->ibs_control;
+    if (status->current_position <= start_index) {
+        return 0;
+    }
+
+    UINT64 end_index = MIN(start_index + entry_count, status->current_position);
+    for (UINT64 i = start_index; i < end_index; i++) {
+        CopyMem(target_buffer, &status->event_buffer[i], sizeof(IBSEvent));
+        target_buffer += sizeof(IBSEvent);
+    }
+
+    return (void*)(end_index - start_index);
+}

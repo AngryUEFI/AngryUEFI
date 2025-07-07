@@ -55,6 +55,13 @@ SMP_SAFE void* get_max_ibs_event_count(CoreContext* context); // 0x10012
 // check defines below IBSEvent for what to set
 SMP_SAFE void* set_ibs_event_filter(CoreContext* context, UINT64 mask); // 0x10013
 
+// copies entry_count IBS entries starting at start_index to target_buffer
+// each entry is 16 Bytes, make sure target_buffer is big enough
+// will only copy current entries based on the current position
+// returns the number of entries copied
+// mostly useful for dumping entries into the result buffer for testing/debugging
+SMP_SAFE void* copy_ibs_entries(CoreContext* context, UINT8* target_buffer, UINT64 start_index, UINT64 entry_count); // 0x10014
+
 // support functions that are not actually ASRs
 
 // must be called once from the boot core to init the context for IBS support
