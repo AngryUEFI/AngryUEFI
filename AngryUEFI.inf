@@ -29,7 +29,7 @@
   handlers/ucode.c
   handlers/ucode_execute.c
   handlers/cores.c
-  handlers/handle_isb.c
+  handlers/handle_ibs.c
   system/fault_handling_stubs.s
   system/fault_handling.c
   system/smp.c

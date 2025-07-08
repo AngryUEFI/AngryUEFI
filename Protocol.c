@@ -12,7 +12,7 @@
 #include "handlers/ucode.h"
 #include "handlers/ucode_execute.h"
 #include "handlers/cores.h"
-#include "handlers/handle_isb.h"
+#include "handlers/handle_ibs.h"
 #include "system/paging.h"
 
 UINT8 payload_buffer[RESPONSE_PAYLOAD_SIZE];
