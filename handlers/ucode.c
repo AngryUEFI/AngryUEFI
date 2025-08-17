@@ -37,8 +37,9 @@ EFI_STATUS handle_send_ucode(UINT8* payload, UINTN payload_length, ConnectionCon
         return EFI_INVALID_PARAMETER;
     }
 
+    const UINTN alloc_size = ROUND_UP(UCODE_SIZE, 4096);
     if (ucodes[target_slot].ucode == NULL) {
-        ucodes[target_slot].ucode = AllocateZeroPool(UCODE_SIZE);
+        ucodes[target_slot].ucode = AllocatePages(alloc_size / 4096);
         if (ucodes[target_slot].ucode == NULL) {
             FormatPrintDebug(L"Unable to allocate memory for ucode.\n");
             send_status(0x3, FormatBuffer, ctx);
@@ -83,8 +84,9 @@ EFI_STATUS handle_flip_bits(UINT8* payload, UINTN payload_length, ConnectionCont
     
     if (target_slot != 1) {
         if (ucodes[1].ucode == NULL) {
-            ucodes[1].ucode = AllocateZeroPool(UCODE_SIZE);
-            ucodes[1].length = UCODE_SIZE;
+            const UINTN alloc_size = ROUND_UP(UCODE_SIZE, 4096);
+            ucodes[1].ucode = AllocatePages(alloc_size / 4096);
+            ucodes[1].length = alloc_size;
         }
         CopyMem(ucodes[1].ucode, ucodes[target_slot].ucode, ucodes[target_slot].length);
         ucodes[1].length = ucodes[target_slot].length;
@@ -303,8 +305,9 @@ static void ensure_ucode_slot_0() {
         FormatPrint(L"Warning: No known good update for CPUID 0x%x! Load ucode slot 0!\n", my_cpuid);
     }
     if (ucodes[0].ucode == NULL) {
-        ucodes[0].ucode = AllocateZeroPool(UCODE_SIZE);
-        ucodes[0].length = UCODE_SIZE;
+        const UINTN alloc_size = ROUND_UP(UCODE_SIZE, 4096);
+        ucodes[0].ucode = AllocatePages(alloc_size / 4096);
+        ucodes[0].length = alloc_size;
         if (db_entry != NULL) {
             CopyMem(ucodes[0].ucode, db_entry->update, db_entry->update_length);
             ucodes[0].length = db_entry->update_length;

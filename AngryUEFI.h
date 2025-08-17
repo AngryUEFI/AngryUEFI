@@ -26,6 +26,8 @@
 #define FormatPrint(fmt, ...) \
     do { UnicodeSPrint(FormatBuffer, sizeof(FormatBuffer), fmt, ##__VA_ARGS__);  Print(FormatBuffer);} while (0)
 
+#define ROUND_UP(x, align)  ( ((x) + ((align) - 1)) & ~((align) - 1) )
+
 #define RECEIVE_BUFFER_SIZE 1*1024*1024+12
 extern UINT8 receive_buffer[RECEIVE_BUFFER_SIZE];
 extern EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *TextOutput;
