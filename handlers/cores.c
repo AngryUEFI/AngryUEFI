@@ -14,6 +14,7 @@
 #include "Protocol.h"
 #include "asr/asr.h"
 #include "asr/ibs.h"
+#include "asr/dsm.h"
 
 #include "system/fault_handling.h"
 #include "system/fault_handling_stubs.h"
@@ -111,6 +112,9 @@ void core_main_loop(CoreContext* context) {
 
     // (re-)init IBS
     init_ibs_on_core(context);
+
+    // (re-)init DSM
+    init_dsm_on_core(context);
 
     // ready for work :)
     context->started = 1;
@@ -415,6 +419,7 @@ static void init_core_contexts() {
             current->asr_registry = get_default_asr_registry();
 
             init_ibs_for_context(current);
+            init_dsm_for_context(current);
         }
     }
 

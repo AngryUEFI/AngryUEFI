@@ -34,6 +34,7 @@ ASREntry asr_registry[] = {
     {0x11001, prepare_dsm},
     {0x11002, prepare_dsm_capture},
     {0x11003, store_dsm_capture},
+    {0x11004, get_start_stop_stub_asm_address},
     {0x11011, start_dsm_capture},
     {0x11012, stop_dsm_capture},
 

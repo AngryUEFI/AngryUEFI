@@ -66,6 +66,7 @@ typedef struct CoreFunctionCall_s {
 typedef struct CoreFaultInfo_s CoreFaultInfo;
 typedef struct ASREntry_s ASREntry;
 typedef struct IBSControl_s IBSControl;
+typedef struct DSMControl_s DSMControl;
 
 // each core gets its own copy of this control structure
 // jobs operate on this structure
@@ -151,6 +152,10 @@ typedef struct CoreContext_s {
 
     // IBS handling stores state here
     IBSControl* ibs_control;
+
+    // DSM handling stores state here
+    DSMControl* dsm_control;
+
 
     // flags used to control the core state
     // read and written from core_id and core 0

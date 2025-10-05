@@ -13,6 +13,7 @@
 #include "handlers/ucode_execute.h"
 #include "handlers/cores.h"
 #include "handlers/handle_ibs.h"
+#include "handlers/handle_dsm.h"
 #include "system/paging.h"
 
 UINT8 payload_buffer[RESPONSE_PAYLOAD_SIZE];
@@ -88,6 +89,9 @@ EFI_STATUS handle_message(UINT8* message, UINTN message_length, ConnectionContex
             break;
         case MSG_GETIBSBUFFER:
             handle_get_ibs_buffer(message + payload_offset, message_length - payload_offset, ctx);
+            break;
+        case MSG_GETDSMBUFFER:
+            handle_get_dsm_buffer(message + payload_offset, message_length - payload_offset, ctx);
             break;
         
         default:
