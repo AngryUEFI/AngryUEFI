@@ -322,6 +322,7 @@ EFI_STATUS handle_send_machine_code(UINT8* payload, UINTN payload_length, Connec
     }
 
     if (machine_codes[target_slot].machine_code == NULL) {
+        // TODO: page align machine code slots
         machine_codes[target_slot].machine_code = AllocateZeroPool(MACHINE_CODE_SIZE);
         if (machine_codes[target_slot].machine_code == NULL) {
             FormatPrint(L"Unable to allocate memory for machine_code.\n");

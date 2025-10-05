@@ -30,6 +30,7 @@
   handlers/ucode_execute.c
   handlers/cores.c
   handlers/handle_ibs.c
+  handlers/handle_dsm.c
   system/fault_handling_stubs.s
   system/fault_handling.c
   system/smp.c
@@ -40,6 +41,8 @@
   asr/asr.c
   asr/sysinfo.c
   asr/ibs.c
+  asr/dsm.c
+  asr/dsm_stubs.s
 
 [Packages]
   MdePkg/MdePkg.dec

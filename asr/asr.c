@@ -9,11 +9,14 @@
 
 #include "sysinfo.h"
 #include "ibs.h"
+#include "dsm.h"
 
 ASREntry asr_registry[] = {
+    // sysinfo
     {0x1001, get_ucode_slot_addr},
     {0x1002, get_machine_slot_addr},
 
+    // IBS
     {0x10001, clear_ibs},
     {0x10002, set_ibs_offset},
     {0x10003, start_ibs},
@@ -26,6 +29,15 @@ ASREntry asr_registry[] = {
     // {0x10012, get_max_ibs_event_count},
     // {0x10013, set_ibs_event_filter},
     {0x10014, copy_ibs_entries},
+
+    // DSM
+    {0x11001, prepare_dsm},
+    {0x11002, prepare_dsm_capture},
+    {0x11003, store_dsm_capture},
+    {0x11011, start_dsm_capture},
+    {0x11012, stop_dsm_capture},
+
+
     // zero entry to signal end of list
     {0, NULL}
 };
