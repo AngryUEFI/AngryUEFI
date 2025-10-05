@@ -31,6 +31,6 @@ extern UcodeContainer ucodes[UCODE_SLOTS];
 extern UINT8* original_ucode;
 
 // big enough for family 0x19/Zen 5
-#define UCODE_SIZE 4 * 4096
+#define UCODE_SIZE (4 * 4096)
 
 #endif /* UCODE_H */
